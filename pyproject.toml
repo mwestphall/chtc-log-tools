@@ -1,0 +1,14 @@
+[project]
+dynamic = ["version"]
+name = "chtc-logs-tool"
+dependencies = [
+    "typer",
+    "pytz"
+]
+
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+[project.scripts]
+chtc-log-tools = "log_tools.cli:app"
