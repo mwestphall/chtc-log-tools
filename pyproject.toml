@@ -3,7 +3,8 @@ dynamic = ["version"]
 name = "chtc-logs-tool"
 dependencies = [
     "typer",
-    "pytz"
+    "pytz",
+    "dotenv",
 ]
 
 [build-system]
