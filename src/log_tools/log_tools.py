@@ -6,6 +6,7 @@ import pytz
 import json
 import typing as t
 
+from .file_utils import read_file_reverse
 def filter_logs_by_date(
     log_path: Annotated[Path, typer.Argument(help="Path to the log file(s) to parse")],
     start_date: Annotated[datetime, typer.Option(help="First date/time from which to return logs")] = datetime.min,
@@ -24,12 +25,10 @@ def filter_logs_by_date(
     # Parse a list of key, value pairs out of filters (assumed to be a list of "key=value" strings)
     # TODO input validation
     filter_list : dict[str, str] = dict(f.split("=") for f in filters)
-
-    # TODO a real implementation of log filtering
-    with open(log_path, 'r') as logf:
-        while line := logf.readline():
-            fields :dict[str, t.Any]= json.loads(line)
-            time = datetime.fromisoformat(fields[time_field])
-            if start_date <= time <= end_date and all(fields.get(k) == v for k, v in filter_list.items()):
-                print(line)
+    
+    for line in read_file_reverse(log_path):
+        fields :dict[str, t.Any]= json.loads(line)
+        time = datetime.fromisoformat(fields[time_field])
+        if start_date <= time <= end_date and all(fields.get(k) == v for k, v in filter_list.items()):
+            print(line)
 
