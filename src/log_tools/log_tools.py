@@ -6,7 +6,7 @@ import pytz
 import json
 import typing as t
 from . import common_args as ca
-from .utils import readlines_reverse
+from .utils import readlines_reverse, read_file_reverse
 
 filterer = typer.Typer()
 
@@ -39,18 +39,17 @@ def filter_logs_by_date(
     filter_list : dict[str, str] = dict(f.split("=") for f in filters)
 
     # TODO a real implementation of log filtering
-    with open(log_path, 'rb') as logf:
-        for idx, line in enumerate(readlines_reverse(logf)):
-            try:
-                fields :dict[str, t.Any]= json.loads(line)
-            except json.JSONDecodeError as e:
-                print(f"UNABLE TO PARSE LINE: '''\n\t{line}'''")
-                continue
+    for idx, line in enumerate(read_file_reverse(log_path, chunk_size = 2048*12)):
+        try:
+            fields :dict[str, t.Any]= json.loads(line)
+        except json.JSONDecodeError as e:
+            print(f"UNABLE TO PARSE LINE: '''\n\t{line}'''")
+            continue
 
-            time = datetime.fromisoformat(fields[time_field])
-            if dt_in_range_fix_tz(start_date, time, end_date) and all(fields.get(k) == v for k, v in filter_list.items()):
-                print(line)
+        time = datetime.fromisoformat(fields[time_field])
+        if dt_in_range_fix_tz(start_date, time, end_date) and all(fields.get(k) == v for k, v in filter_list.items()):
+            print(line)
 
-            if max_lines and idx >= max_lines:
-                break
+        if max_lines and idx >= max_lines:
+            break
 
