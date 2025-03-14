@@ -2,9 +2,10 @@ import typer
 from typing import Annotated
 from pathlib import Path
 from datetime import datetime
-from .common_args import common_args, LogPathOpt
+from .common_args import LogPathOpt
 
 sequence = typer.Typer(help="Sub-commands to validate log sequence numbers")
+
 
 @sequence.command("list")
 def list_sequences(

@@ -11,15 +11,11 @@ load_dotenv()
 class CommonArgs:
     start_date: datetime
     end_date: datetime
+    max_lines: int
     time_field: str
 
 LogPathOpt = Annotated[Path, typer.Argument(help="Path to the log file(s) to parse")]
-
-def common_args(
-        ctx: typer.Context,
-        start_date: Annotated[datetime, typer.Option(help="First date/time from which to return logs")] = datetime.min,
-        end_date: Annotated[datetime, typer.Option(help="Last date/time from which to return logs")] = datetime.max,
-        time_field: Annotated[str, typer.Option(help="Structured log field to parse timestamps from", envvar="TIME_FIELD")] = "time",
-):
-    """ Universal Args """
-    ctx.obj = CommonArgs(start_date, end_date, time_field)
+StartDateArg = Annotated[datetime, typer.Option(help="First date/time from which to return logs")]
+EndDateArg = Annotated[datetime, typer.Option(help="Last date/time from which to return logs")]
+MaxLinesArg = Annotated[int, typer.Option(help="Max number of lines to seek backwards")]
+TimeFieldArg = Annotated[str, typer.Option(help="Structured log field to parse timestamps from", envvar="TIME_FIELD")]
