@@ -1,7 +1,7 @@
 import typer
 from datetime import datetime
 from . import common_args as ca
-from .file_utils import read_file_reverse
+from .file_utils import read_file_reverse, aggregate_log_files
 from .log_tools import dt_in_range_fix_tz
 from .log_utils import safe_parse_line
 from collections import defaultdict
@@ -23,7 +23,7 @@ def check_sequence(
 
     # For each logger, record every log sequence appearing under its logger ID
     logger_ids : dict[str, list[int]]= defaultdict(list)
-    for idx, line in enumerate(read_file_reverse(log_path, chunk_size = 2048*12)):
+    for idx, line in enumerate(aggregate_log_files(log_path, time_field)):
         parsed, fields = safe_parse_line(line)
         if not parsed:
             continue

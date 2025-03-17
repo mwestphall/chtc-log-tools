@@ -1,5 +1,4 @@
 import typer
-from dataclasses import dataclass
 from dotenv import load_dotenv
 from pathlib import Path
 from datetime import datetime

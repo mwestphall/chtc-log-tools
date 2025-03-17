@@ -3,7 +3,7 @@ from typing import Annotated
 from datetime import datetime
 from . import common_args as ca
 from .log_utils import safe_parse_line
-from .file_utils import read_file_reverse
+from .file_utils import read_file_reverse, aggregate_log_files
 
 filterer = typer.Typer()
 
@@ -36,7 +36,7 @@ def filter_logs_by_date(
     filter_list : dict[str, str] = dict(f.split("=") for f in filters)
 
     # TODO a real implementation of log filtering
-    for idx, line in enumerate(read_file_reverse(log_path, chunk_size = 2048*12)):
+    for idx, line in enumerate(aggregate_log_files(log_path, time_field)):
         parsed, fields = safe_parse_line(line)
         if not parsed:
             continue
