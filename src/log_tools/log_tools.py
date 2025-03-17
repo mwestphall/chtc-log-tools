@@ -1,12 +1,9 @@
 import typer
 from typing import Annotated
 from datetime import datetime
-from pathlib import Path
-import pytz
-import json
-import typing as t
 from . import common_args as ca
-from .utils import readlines_reverse, read_file_reverse
+from .log_utils import safe_parse_line
+from .file_utils import read_file_reverse
 
 filterer = typer.Typer()
 
@@ -28,7 +25,7 @@ def filter_logs_by_date(
         end_date: ca.EndDateArg = datetime.max,
         time_field: ca.TimeFieldArg = 'time',
         max_lines: ca.MaxLinesArg = 0,
-        filters: Annotated[list[str], typer.Option(help="Key-Value pairs that should appear in the logs")] = []
+        filters: Annotated[list[str], typer.Option("-f", "--filters", help="Key-Value pairs that should appear in the logs")] = []
 ):
     """ Reference function that parses newline-delimited, JSON formatted 
     logs based on a time range
@@ -40,10 +37,8 @@ def filter_logs_by_date(
 
     # TODO a real implementation of log filtering
     for idx, line in enumerate(read_file_reverse(log_path, chunk_size = 2048*12)):
-        try:
-            fields :dict[str, t.Any]= json.loads(line)
-        except json.JSONDecodeError as e:
-            print(f"UNABLE TO PARSE LINE: '''\n\t{line}'''")
+        parsed, fields = safe_parse_line(line)
+        if not parsed:
             continue
 
         time = datetime.fromisoformat(fields[time_field])

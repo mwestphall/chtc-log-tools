@@ -7,13 +7,6 @@ from typing import Annotated
 
 load_dotenv()
 
-@dataclass
-class CommonArgs:
-    start_date: datetime
-    end_date: datetime
-    max_lines: int
-    time_field: str
-
 LogPathOpt = Annotated[Path, typer.Argument(help="Path to the log file(s) to parse")]
 StartDateArg = Annotated[datetime, typer.Option(help="First date/time from which to return logs")]
 EndDateArg = Annotated[datetime, typer.Option(help="Last date/time from which to return logs")]

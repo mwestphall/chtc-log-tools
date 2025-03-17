@@ -1,69 +1,51 @@
 import typer
-from typing import Annotated
-import typing as t
-from pathlib import Path
 from datetime import datetime
-import json
 from . import common_args as ca
-from .utils import readlines_reverse
+from .file_utils import read_file_reverse
 from .log_tools import dt_in_range_fix_tz
+from .log_utils import safe_parse_line
+from collections import defaultdict
 
 sequence = typer.Typer(help="Sub-commands to validate log sequence numbers")
 
-
-@sequence.command("list")
-def list_sequences(
-    log_path: ca.LogPathOpt,
-    start_date: ca.StartDateArg = datetime.min,
-    end_date: ca.EndDateArg = datetime.max,
-    time_field: ca.TimeFieldArg = 'time',
-    max_lines: ca.MaxLinesArg = 0,
-):
-    """ Given a set of log files - return the unique logger IDs appearing 
-    in those files 
-    """
-    pass
-
-
-
-@sequence.command("check")
+@sequence.callback(invoke_without_command=True)
 def check_sequence(
     log_path: ca.LogPathOpt,
-    logger_id: Annotated[str, typer.Argument(help="Logger ID to verify")],
     start_date: ca.StartDateArg = datetime.min,
     end_date: ca.EndDateArg = datetime.max,
     time_field: ca.TimeFieldArg = 'time',
     max_lines: ca.MaxLinesArg = 0,
 ):
-    """ Given a sequence ID appearing in a set of log files 
-    - return any gaps in that logger's sequence
+    """ Given a set of log files containing the special "sequence_info" JSON sub-object:
+    {"sequence_info": {"logger_id": "<uuid>", "sequence_no": <int> }}
+    return any gaps in the log sequences appearing in that file
     """
 
-    all_ids = []
-    with open(log_path, 'rb') as logf:
-        for idx, line in enumerate(readlines_reverse(logf)):
-            if not line:
-                continue
-            try:
-                fields :dict[str, t.Any]= json.loads(line)
-            except json.JSONDecodeError as e:
-                print(f"UNABLE TO PARSE LINE: '''\n\t{line}'''")
-                continue
+    # For each logger, record every log sequence appearing under its logger ID
+    logger_ids : dict[str, list[int]]= defaultdict(list)
+    for idx, line in enumerate(read_file_reverse(log_path, chunk_size = 2048*12)):
+        parsed, fields = safe_parse_line(line)
+        if not parsed:
+            continue
 
-            time = datetime.fromisoformat(fields[time_field])
-            if dt_in_range_fix_tz(start_date, time, end_date) and fields["sequence_info"]["logger_id"] == logger_id:
-                all_ids.append(fields["sequence_info"]["sequence_no"])
+        time = datetime.fromisoformat(fields[time_field])
+        if dt_in_range_fix_tz(start_date, time, end_date) and fields.get("sequence_info", dict()).get("logger_id"):
+            logger_ids[fields["sequence_info"]["logger_id"]].append(fields["sequence_info"]["sequence_no"])
 
-            if max_lines and idx >= max_lines:
-                break
-    all_ids.sort()
-    diffs = [l2 - l1 for l1, l2 in zip(all_ids, all_ids[1:])]
-    missing_idx = [i for i, v in enumerate(diffs) if v > 1]
-    start_idx = all_ids[0]
-    end_idx = all_ids[-1]
-    if not missing_idx:
-        print(f"All log IDs present between {start_idx} and {end_idx}")
-    for idx in missing_idx:
-        gap = diffs[idx]
-        val = all_ids[idx]
-        print(f"Missing {gap - 1} logs after sequence {val}")
+        if max_lines and idx >= max_lines:
+            break
+
+    # For each logger, compute any gaps in the logger's recorded sequence
+    for logger_id, all_ids in logger_ids.items():
+        all_ids.sort() # Sort the list of recorded IDs
+        diffs = [l2 - l1 for l1, l2 in zip(all_ids, all_ids[1:])] # Compute gaps between log sequence #s
+        missing_idx = [i for i, v in enumerate(diffs) if v > 1] # Find indices where gap > 1
+        start_idx = all_ids[0]
+        end_idx = all_ids[-1]
+        print(f"Log sequence stats for logger {logger_id}")
+        for idx in missing_idx:
+            gap = diffs[idx]
+            val = all_ids[idx]
+            print(f"  Missing {gap - 1} logs after sequence {val}")
+        else:
+            print(f"  All log IDs present between {start_idx} and {end_idx}")
