@@ -22,12 +22,12 @@ def read_file_reverse(file_path, chunk_size=40960):
             position -= read_size
 
             f.seek(position)
-            chunk = f.read(read_size).decode()
+            chunk = f.read(read_size)
 
-            lines = chunk.split('\n')
+            lines = chunk.split(b'\n')
 
             if buffer is not None:
-                if chunk[-1] == '\n':
+                if chunk[-1] == b'\n':
                     yield buffer  # Yield previous buffer since it's complete
                 else:
                     lines[-1] += buffer  # Merge buffer with last line of current chunk
@@ -37,7 +37,7 @@ def read_file_reverse(file_path, chunk_size=40960):
             # Yield non-empty lines in reverse order
             for line in reversed(lines):
                 if line.strip():
-                    yield line
+                    yield line.decode()
 
         # Yield the last buffered line if it's valid
         if buffer and buffer.strip():
