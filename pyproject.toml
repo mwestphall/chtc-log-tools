@@ -4,8 +4,14 @@ name = "chtc-logs-tool"
 dependencies = [
     "typer",
     "pytz",
+<<<<<<< HEAD
     "dotenv",
+=======
+    "python-magic"
+>>>>>>> main
 ]
+
+requires-python = ">=3.11"  # Fixed missing closing quote
 
 [build-system]
 requires = ["setuptools >= 61.0"]
