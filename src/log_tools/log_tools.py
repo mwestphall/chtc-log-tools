@@ -13,8 +13,9 @@ def filter_logs_by_date(
         log_path: ca.LogPathOpt,
         start_date: ca.StartDateArg = datetime.min,
         end_date: ca.EndDateArg = datetime.max,
-        time_field: ca.TimeFieldArg = 'time',
+        time_field: ca.TimeFieldArg = ca.TIME_FIELD,
         max_lines: ca.MaxLinesArg = 0,
+        chunk_size: ca.ChunkSizeArg = ca.CHUNK_SIZE,
         filters: Annotated[list[str], typer.Option("-f", "--filters", help="Key-Value pairs that should appear in the logs")] = []
 ):
     """ Reference function that parses newline-delimited, JSON formatted 
@@ -26,7 +27,7 @@ def filter_logs_by_date(
     filter_list : dict[str, str] = dict(f.split("=") for f in filters)
 
     # TODO a real implementation of log filtering
-    for idx, line in enumerate(aggregate_log_files(log_path, start_date, end_date, time_field)):
+    for idx, line in enumerate(aggregate_log_files(log_path, start_date, end_date, time_field, chunk_size)):
         parsed, fields = safe_parse_line(line)
         if not parsed:
             continue

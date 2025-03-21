@@ -4,10 +4,10 @@ import magic
 from pathlib import Path
 from typing import Iterator, Any
 import io
-import glob
-from .log_utils import safe_parse_line, dt_in_range_fix_tz
+from .log_utils import safe_parse_line
 from datetime import datetime, timezone
 from dataclasses import dataclass
+from common_args import CHUNK_SIZE
 
 def open_possibly_compressed_file(file_path: Path) -> io.BytesIO:
     """ Using python-magic, expose a plaintext or compressed file in 
@@ -22,7 +22,7 @@ def open_possibly_compressed_file(file_path: Path) -> io.BytesIO:
     return open_func(file_path, 'rb')
 
 
-def read_file_reverse(file_path: Path, chunk_size=40960) -> Iterator[str]:
+def read_file_reverse(file_path: Path, chunk_size=CHUNK_SIZE) -> Iterator[str]:
     """ Reads a regular or compressed (.gz) text file line by line in reverse 
     order using chunk-based processing.
     """
@@ -89,7 +89,7 @@ def aggregate_log_files(
         start_date: datetime = datetime.min,
         end_date: datetime = datetime.max,
         time_key: str = "time", 
-        chunk_size: int = 40960) -> Iterator[str]:
+        chunk_size: int = CHUNK_SIZE) -> Iterator[str]:
     """ Given a log file path, run read_file_reverse over all files matching 
     that pattern.
     """
@@ -110,9 +110,7 @@ def aggregate_log_files(
 
     for file in sorted_files:
         fname = file.path
-        contains_logs = file.contains_logs_for(start_date, end_date)
-        print(file, contains_logs)
-        if not contains_logs:
+        if not file.contains_logs_for(start_date, end_date):
             continue
         for l in read_file_reverse(fname, chunk_size):
             yield l
