@@ -1,5 +1,7 @@
 import json
 import typing
+import sys
+from common_args import TIME_FIELD
 from datetime import datetime, timedelta
 
 
@@ -42,3 +44,34 @@ def done_iterating(idx: int, max_lines: int, time: datetime, start_time: datetim
     """
     return ((max_lines and idx > max_lines) or
         compare_dts_fix_tz(start_time, time) > timedelta(minutes=time_window))
+
+
+COLOR_CODES = {
+    "DEBUG": "\033[36m", # Cyan
+    "INFO":  "\033[32m", # Green
+    "WARN":  "\033[33m", # Yellow
+    "ERROR": "\033[31m", # Red
+    "RESET": "\033[0m" # Unset
+}
+
+# Reserved JSON keys in log message
+SPECIAL_KEYS = ["msg", "level", "sequence_info"]
+
+def pretty_print(log_json: dict[str, typing.Any], filter_keys = [], time_key: str = TIME_FIELD):
+    start_code = COLOR_CODES[log_json.get("level", "RESET")]
+    reset_code = COLOR_CODES["RESET"]
+
+    print(f"{log_json.get(time_key):<} ", end="")
+    print(f"{start_code}{log_json.get('level')}:{reset_code} ", end="")
+    print(f"{log_json.get('msg')} ", end="")
+
+
+    extra_attrs = [f"{k}={v}" for k, v in log_json.items() if k not in [TIME_FIELD, *SPECIAL_KEYS]]
+    if extra_attrs:
+        print(f"[{', '.join(extra_attrs)}]", end="")
+
+
+    print("") # Newline
+
+
+    

@@ -4,9 +4,10 @@ from datetime import datetime
 from enum import Enum
 import re
 from . import common_args as ca
-from .log_utils import safe_parse_line, dt_in_range_fix_tz, done_iterating
+from .log_utils import safe_parse_line, dt_in_range_fix_tz, done_iterating, pretty_print
 from .file_utils import  aggregate_log_files
 from thefuzz import fuzz
+import sys
 
 filterer = typer.Typer()
 
@@ -17,6 +18,8 @@ class FilterMode(Enum):
 
 
 def value_matches(value: str, filter: str, mode: FilterMode):
+    if not value:
+        return False
     if mode == FilterMode.RAW:
         return filter.lower() in value.lower()
     elif mode == FilterMode.REGEX:
@@ -41,10 +44,10 @@ def filter_logs_by_date(
     """
 
     # Parse a list of key, value pairs out of filters (assumed to be a list of "key=value" strings)
-    # TODO input validation
     filter_list : dict[str, str] = dict(f.split("=") for f in filters)
 
-    # TODO a real implementation of log filtering
+    output_tty = sys.stdout.isatty()
+
     for idx, line in enumerate(aggregate_log_files(log_path, start_date, end_date, time_field, chunk_size)):
         parsed, fields = safe_parse_line(line)
         if not parsed:
@@ -52,7 +55,10 @@ def filter_logs_by_date(
 
         time = datetime.fromisoformat(fields[time_field])
         if dt_in_range_fix_tz(start_date, time, end_date) and all(value_matches(fields.get(k), f, filter_mode) for k, f in filter_list.items()):
-            print(line)
+            if output_tty:
+                pretty_print(fields)
+            else:
+                print(line)
 
         if done_iterating(idx, max_lines, time, start_date):
             break
