@@ -6,7 +6,8 @@ from typing import Iterator, Any
 import io
 import glob
 from .log_utils import safe_parse_line, dt_in_range_fix_tz
-from datetime import datetime
+from datetime import datetime, timezone
+from dataclasses import dataclass
 
 def open_possibly_compressed_file(file_path: Path) -> io.BytesIO:
     """ Using python-magic, expose a plaintext or compressed file in 
@@ -68,6 +69,21 @@ def _is_structured_logs(file_path: Path) -> tuple[bool, dict[str, Any]]:
         line = f.readline()
         return safe_parse_line(line)
 
+@dataclass
+class DateRangedLogFile:
+    path: str
+    start_time: datetime
+    end_time: datetime = datetime.max.replace(tzinfo=timezone.utc)
+
+
+    def contains_logs_for(self, start_time: datetime, end_time: datetime):
+        """ Return whether this log's time range overlaps with the given time range"""
+        start_time_tz = start_time.replace(tzinfo=start_time.tzinfo or self.start_time.tzinfo)
+        end_time_tz = end_time.replace(tzinfo=end_time.tzinfo or self.end_time.tzinfo)
+        latest_start = max(self.start_time, start_time_tz)
+        earliest_end = min(self.end_time, end_time_tz)
+        return earliest_end > latest_start
+
 def aggregate_log_files(
         log_path: Path, 
         start_date: datetime = datetime.min,
@@ -77,7 +93,7 @@ def aggregate_log_files(
     """ Given a log file path, run read_file_reverse over all files matching 
     that pattern.
     """
-    sorted_files : list[tuple[str,datetime]] = []
+    sorted_files : list[DateRangedLogFile] = []
     # Find all newline-delimited JSON files in the given directory
     all_log_files = [log_path] if log_path.is_file() else [f for f in log_path.iterdir() if f.is_file()]
     for file_path in all_log_files:
@@ -85,22 +101,18 @@ def aggregate_log_files(
         # Filter out ndjson objects that don't contain the expected time key
         if not parsed or not time_key in fields:
             continue
-        sorted_files.append((file_path, datetime.fromisoformat(fields[time_key])))
-    sorted_files.sort(key = lambda pair: pair[1], reverse = True)
-    print(sorted_files)
+        sorted_files.append(DateRangedLogFile(file_path, datetime.fromisoformat(fields[time_key])))
+    sorted_files.sort(key = lambda file: file.start_time, reverse = True)
 
-    # (Assuming all files contain) ascending chronological timestamps
-    # filter down to just the files with a start time between the start and end time
-    # given, +1 at the end
-    included_indices = []
-    for i, (_, file_start_time) in enumerate(sorted_files):
-        if dt_in_range_fix_tz(start_date, file_start_time, end_date):
-            included_indices.append(i)
-    if included_indices[-1] < len(sorted_files) - 1:
-        included_indices.append(included_indices[-1]+1)
+    # set the end of each file to the start of the next
+    for file, next_file in zip(sorted_files[1:], sorted_files):
+        file.end_time = next_file.start_time
 
-    for idx in included_indices:
-        fname = sorted_files[idx][0]
-        print(fname)
+    for file in sorted_files:
+        fname = file.path
+        contains_logs = file.contains_logs_for(start_date, end_date)
+        print(file, contains_logs)
+        if not contains_logs:
+            continue
         for l in read_file_reverse(fname, chunk_size):
             yield l

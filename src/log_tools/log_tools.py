@@ -2,7 +2,7 @@ import typer
 from typing import Annotated
 from datetime import datetime
 from . import common_args as ca
-from .log_utils import safe_parse_line, dt_in_range_fix_tz
+from .log_utils import safe_parse_line, dt_in_range_fix_tz, done_iterating
 from .file_utils import  aggregate_log_files
 
 filterer = typer.Typer()
@@ -35,6 +35,6 @@ def filter_logs_by_date(
         if dt_in_range_fix_tz(start_date, time, end_date) and all(fields.get(k) == v for k, v in filter_list.items()):
             print(line)
 
-        if max_lines and idx >= max_lines:
+        if done_iterating(idx, max_lines, time, start_date):
             break
 

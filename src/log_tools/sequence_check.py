@@ -2,7 +2,7 @@ import typer
 from datetime import datetime
 from . import common_args as ca
 from .file_utils import aggregate_log_files
-from .log_tools import dt_in_range_fix_tz
+from .log_tools import dt_in_range_fix_tz, done_iterating
 from .log_utils import safe_parse_line
 from collections import defaultdict
 
@@ -94,7 +94,7 @@ def check_sequence(
     """
 
     # For each logger, record every log sequence appearing under its logger ID
-    logger_ids : dict[str, list[int]]= defaultdict(list)
+    logger_ids = defaultdict(MissingNumberTracker)
     for idx, line in enumerate(aggregate_log_files(log_path, start_date, end_date, time_field)):
         parsed, fields = safe_parse_line(line)
         if not parsed:
@@ -104,7 +104,7 @@ def check_sequence(
         if dt_in_range_fix_tz(start_date, time, end_date) and fields.get("sequence_info", dict()).get("logger_id"):
             logger_ids[fields["sequence_info"]["logger_id"]].add_number(fields["sequence_info"]["sequence_no"])
 
-        if max_lines and idx >= max_lines:
+        if done_iterating(idx, max_lines, time, start_date):
             break
 
     # For each logger, compute any gaps in the logger's recorded sequence
