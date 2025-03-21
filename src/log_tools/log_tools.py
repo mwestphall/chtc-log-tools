@@ -1,12 +1,29 @@
 import typer
 from typing import Annotated
 from datetime import datetime
+from enum import Enum
+import re
 from . import common_args as ca
 from .log_utils import safe_parse_line, dt_in_range_fix_tz, done_iterating
 from .file_utils import  aggregate_log_files
+from thefuzz import fuzz
 
 filterer = typer.Typer()
 
+class FilterMode(Enum):
+    RAW = "raw"
+    REGEX = "regex"
+    FUZZY = "fuzzy"
+
+
+def value_matches(value: str, filter: str, mode: FilterMode):
+    if mode == FilterMode.RAW:
+        return filter.lower() in value.lower()
+    elif mode == FilterMode.REGEX:
+        return re.search(filter, value)
+    else:
+        # TODO does having a fixed threshold here make sense?
+        return fuzz.partial_ratio(value, filter) > 75 
 
 @filterer.callback(invoke_without_command=True)
 def filter_logs_by_date(
@@ -16,7 +33,8 @@ def filter_logs_by_date(
         time_field: ca.TimeFieldArg = ca.TIME_FIELD,
         max_lines: ca.MaxLinesArg = 0,
         chunk_size: ca.ChunkSizeArg = ca.CHUNK_SIZE,
-        filters: Annotated[list[str], typer.Option("-f", "--filters", help="Key-Value pairs that should appear in the logs")] = []
+        filters: Annotated[list[str], typer.Option("-f", "--filters", help="Key-Value pairs that should appear in the logs")] = [],
+        filter_mode: Annotated[FilterMode, typer.Option("-m", "--filter-mode", help="String comparison mode to use for filtering logs")] = FilterMode.RAW.value
 ):
     """ Reference function that parses newline-delimited, JSON formatted 
     logs based on a time range
@@ -33,7 +51,7 @@ def filter_logs_by_date(
             continue
 
         time = datetime.fromisoformat(fields[time_field])
-        if dt_in_range_fix_tz(start_date, time, end_date) and all(fields.get(k) == v for k, v in filter_list.items()):
+        if dt_in_range_fix_tz(start_date, time, end_date) and all(value_matches(fields.get(k), f, filter_mode) for k, f in filter_list.items()):
             print(line)
 
         if done_iterating(idx, max_lines, time, start_date):

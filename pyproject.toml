@@ -5,7 +5,8 @@ dependencies = [
     "typer",
     "pytz",
     "dotenv",
-    "python-magic"
+    "python-magic",
+    "thefuzz",
 ]
 
 requires-python = ">=3.11"  # Fixed missing closing quote
