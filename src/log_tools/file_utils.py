@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Iterator, Any
 import io
 import glob
-from .log_utils import safe_parse_line
+from .log_utils import safe_parse_line, dt_in_range_fix_tz
 from datetime import datetime
 
 def open_possibly_compressed_file(file_path: Path) -> io.BytesIO:
@@ -68,20 +68,39 @@ def _is_structured_logs(file_path: Path) -> tuple[bool, dict[str, Any]]:
         line = f.readline()
         return safe_parse_line(line)
 
-def aggregate_log_files(log_path: Path, time_key: str, chunk_size: int = 40960) -> Iterator[str]:
+def aggregate_log_files(
+        log_path: Path, 
+        start_date: datetime = datetime.min,
+        end_date: datetime = datetime.max,
+        time_key: str = "time", 
+        chunk_size: int = 40960) -> Iterator[str]:
     """ Given a log file path, run read_file_reverse over all files matching 
     that pattern.
     """
     sorted_files : list[tuple[str,datetime]] = []
+    # Find all newline-delimited JSON files in the given directory
     all_log_files = [log_path] if log_path.is_file() else [f for f in log_path.iterdir() if f.is_file()]
     for file_path in all_log_files:
         parsed, fields = _is_structured_logs(file_path)
+        # Filter out ndjson objects that don't contain the expected time key
         if not parsed or not time_key in fields:
             continue
-        sorted_files.append((file_path, fields[time_key]))
-    
+        sorted_files.append((file_path, datetime.fromisoformat(fields[time_key])))
     sorted_files.sort(key = lambda pair: pair[1], reverse = True)
     print(sorted_files)
-    for fname, _ in sorted_files:
+
+    # (Assuming all files contain) ascending chronological timestamps
+    # filter down to just the files with a start time between the start and end time
+    # given, +1 at the end
+    included_indices = []
+    for i, (_, file_start_time) in enumerate(sorted_files):
+        if dt_in_range_fix_tz(start_date, file_start_time, end_date):
+            included_indices.append(i)
+    if included_indices[-1] < len(sorted_files) - 1:
+        included_indices.append(included_indices[-1]+1)
+
+    for idx in included_indices:
+        fname = sorted_files[idx][0]
+        print(fname)
         for l in read_file_reverse(fname, chunk_size):
             yield l

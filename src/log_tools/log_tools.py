@@ -2,21 +2,11 @@ import typer
 from typing import Annotated
 from datetime import datetime
 from . import common_args as ca
-from .log_utils import safe_parse_line
-from .file_utils import read_file_reverse, aggregate_log_files
+from .log_utils import safe_parse_line, dt_in_range_fix_tz
+from .file_utils import  aggregate_log_files
 
 filterer = typer.Typer()
 
-
-def dt_in_range_fix_tz(start_date: datetime, date: datetime, end_date: datetime):
-    """
-    Check whether a given date falls within a start and stop date, applying the
-    date's tz to the range endpoints if they do not yet have them
-    """
-    start_date = start_date.replace(tzinfo=date.tzinfo)
-    end_date = end_date.replace(tzinfo=date.tzinfo)
-
-    return start_date <= date <= end_date
 
 @filterer.callback(invoke_without_command=True)
 def filter_logs_by_date(
@@ -36,7 +26,7 @@ def filter_logs_by_date(
     filter_list : dict[str, str] = dict(f.split("=") for f in filters)
 
     # TODO a real implementation of log filtering
-    for idx, line in enumerate(aggregate_log_files(log_path, time_field)):
+    for idx, line in enumerate(aggregate_log_files(log_path, start_date, end_date, time_field)):
         parsed, fields = safe_parse_line(line)
         if not parsed:
             continue
