@@ -23,7 +23,7 @@ def value_matches(value: str, filter: str, mode: FilterMode):
         return re.search(filter, value)
     else:
         # TODO does having a fixed threshold here make sense?
-        return fuzz.partial_ratio(value, filter) > 75 
+        return fuzz.partial_ratio(value.lower(), filter.lower()) > 75 
 
 @filterer.callback(invoke_without_command=True)
 def filter_logs_by_date(
