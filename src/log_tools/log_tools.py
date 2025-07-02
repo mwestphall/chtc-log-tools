@@ -34,6 +34,7 @@ def filter_logs_by_date(
         start_date: ca.StartDateArg = datetime.min,
         end_date: ca.EndDateArg = datetime.max,
         time_field: ca.TimeFieldArg = ca.TIME_FIELD,
+        msg_field: ca.MsgFieldArg = ca.MSG_FIELD,
         max_lines: ca.MaxLinesArg = 0,
         chunk_size: ca.ChunkSizeArg = ca.CHUNK_SIZE,
         filters: Annotated[list[str], typer.Option("-f", "--filters", help="Key-Value pairs that should appear in the logs")] = [],
@@ -56,7 +57,7 @@ def filter_logs_by_date(
         time = datetime.fromisoformat(fields[time_field])
         if dt_in_range_fix_tz(start_date, time, end_date) and all(value_matches(fields.get(k), f, filter_mode) for k, f in filter_list.items()):
             if output_tty:
-                pretty_print(fields)
+                pretty_print(fields, time_key=time_field, msg_key=msg_field)
             else:
                 print(line)
 

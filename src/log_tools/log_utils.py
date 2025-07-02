@@ -1,7 +1,7 @@
 import json
 import typing
 import sys
-from common_args import TIME_FIELD
+from common_args import TIME_FIELD, MSG_FIELD
 from datetime import datetime, timedelta
 
 
@@ -12,7 +12,8 @@ def safe_parse_line(line: str) -> tuple[bool, dict[str, typing.Any]]:
     if not line:
         return False, {}
     try: 
-        return True, json.loads(line)
+        # fluentd records are tab-delimited, typically the JSON body will be the last field
+        return True, json.loads(line.split('\t')[-1])
     except json.JSONDecodeError as e:
         print(f"Unable to JSON-decode formatted line '{line}'")
         return False, {}
@@ -57,16 +58,16 @@ COLOR_CODES = {
 # Reserved JSON keys in log message
 SPECIAL_KEYS = ["msg", "level", "sequence_info"]
 
-def pretty_print(log_json: dict[str, typing.Any], filter_keys = [], time_key: str = TIME_FIELD):
+def pretty_print(log_json: dict[str, typing.Any], filter_keys = [], time_key: str = TIME_FIELD, msg_key: str = MSG_FIELD):
     start_code = COLOR_CODES[log_json.get("level", "RESET")]
     reset_code = COLOR_CODES["RESET"]
 
-    print(f"{log_json.get(time_key):<} ", end="")
-    print(f"{start_code}{log_json.get('level')}:{reset_code} ", end="")
-    print(f"{log_json.get('msg')} ", end="")
+    print(f"{log_json.get(time_key)} ", end="")
+    print(f"{start_code}{log_json.get('level', 'INFO')}:{reset_code} ", end="")
+    print(f"{log_json.get(msg_key)} ", end="")
 
 
-    extra_attrs = [f"{k}={v}" for k, v in log_json.items() if k not in [TIME_FIELD, *SPECIAL_KEYS]]
+    extra_attrs = [f"{k}={v}" for k, v in log_json.items() if k not in [time_key, msg_key, *SPECIAL_KEYS]]
     if extra_attrs:
         print(f"[{', '.join(extra_attrs)}]", end="")
 

@@ -66,7 +66,7 @@ def _is_structured_logs(file_path: Path) -> tuple[bool, dict[str, Any]]:
     """
     with open_possibly_compressed_file(file_path) as f:
         # TODO handle/skip headers?
-        line = f.readline()
+        line = f.readline().decode()
         return safe_parse_line(line)
 
 @dataclass
