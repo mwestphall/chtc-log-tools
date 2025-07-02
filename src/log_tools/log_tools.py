@@ -37,8 +37,11 @@ def filter_logs_by_date(
         msg_field: ca.MsgFieldArg = ca.MSG_FIELD,
         max_lines: ca.MaxLinesArg = 0,
         chunk_size: ca.ChunkSizeArg = ca.CHUNK_SIZE,
+        exclude_keys: ca.ExcludeKeysArg = ca.EXCLUDE_KEYS,
+        partition_key: ca.PartitionKeyArg = "",
         filters: Annotated[list[str], typer.Option("-f", "--filters", help="Key-Value pairs that should appear in the logs")] = [],
-        filter_mode: Annotated[FilterMode, typer.Option("-m", "--filter-mode", help="String comparison mode to use for filtering logs")] = FilterMode.RAW.value
+        filter_mode: Annotated[FilterMode, typer.Option("-m", "--filter-mode", help="String comparison mode to use for filtering logs")] = FilterMode.RAW.value,
+        raw_output: Annotated[bool, typer.Option("--raw", help="Don't pretty-print logs")] = False,
 ):
     """ Reference function that parses newline-delimited, JSON formatted 
     logs based on a time range
@@ -49,15 +52,15 @@ def filter_logs_by_date(
 
     output_tty = sys.stdout.isatty()
 
-    for idx, line in enumerate(aggregate_log_files(log_path, start_date, end_date, time_field, chunk_size)):
+    for idx, line in enumerate(aggregate_log_files(log_path, start_date, end_date, time_field, partition_key, chunk_size)):
         parsed, fields = safe_parse_line(line)
         if not parsed:
             continue
 
         time = datetime.fromisoformat(fields[time_field])
         if dt_in_range_fix_tz(start_date, time, end_date) and all(value_matches(fields.get(k), f, filter_mode) for k, f in filter_list.items()):
-            if output_tty:
-                pretty_print(fields, time_key=time_field, msg_key=msg_field)
+            if output_tty and not raw_output:
+                pretty_print(fields, time_field, msg_field, partition_key, exclude_keys)
             else:
                 print(line)
 

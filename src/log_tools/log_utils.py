@@ -56,18 +56,23 @@ COLOR_CODES = {
 }
 
 # Reserved JSON keys in log message
-SPECIAL_KEYS = ["msg", "level", "sequence_info"]
+SPECIAL_KEYS = ["msg", ]
 
-def pretty_print(log_json: dict[str, typing.Any], filter_keys = [], time_key: str = TIME_FIELD, msg_key: str = MSG_FIELD):
+def pretty_print(
+        log_json: dict[str, typing.Any],
+        time_key: str = TIME_FIELD, 
+        msg_key: str = MSG_FIELD, 
+        partition_key: str = "", 
+        exclude_keys: str = ""):
     start_code = COLOR_CODES[log_json.get("level", "RESET")]
     reset_code = COLOR_CODES["RESET"]
 
-    print(f"{log_json.get(time_key)} ", end="")
+    print(f"{log_json.get(time_key)} {log_json.get(partition_key, '')} ", end="")
     print(f"{start_code}{log_json.get('level', 'INFO')}:{reset_code} ", end="")
     print(f"{log_json.get(msg_key)} ", end="")
 
 
-    extra_attrs = [f"{k}={v}" for k, v in log_json.items() if k not in [time_key, msg_key, *SPECIAL_KEYS]]
+    extra_attrs = [f"{k}={v}" for k, v in log_json.items() if k not in [time_key, msg_key, partition_key, *exclude_keys.split(",")]]
     if extra_attrs:
         print(f"[{', '.join(extra_attrs)}]", end="")
 

@@ -7,7 +7,8 @@ import io
 from .log_utils import safe_parse_line
 from datetime import datetime, timezone
 from dataclasses import dataclass
-from common_args import CHUNK_SIZE
+from collections import defaultdict
+from common_args import CHUNK_SIZE, TIME_FIELD
 
 def open_possibly_compressed_file(file_path: Path) -> io.BytesIO:
     """ Using python-magic, expose a plaintext or compressed file in 
@@ -84,33 +85,58 @@ class DateRangedLogFile:
         earliest_end = min(self.end_time, end_time_tz)
         return earliest_end > latest_start
 
+
+def find_log_files(log_paths: list[Path], max_depth = 999) -> Iterator[Path]:
+    """
+    Given a set of log paths or directories containing logs, and a max search depth, yield
+    all individual files in those paths
+    """
+    for p in log_paths:
+        if p.is_file():
+            yield p
+            continue
+        dirs: list[tuple[Path, int]] = [(p, 0)]
+        while len(dirs) and (dir_tuple := dirs.pop()):
+            cur_dir, cur_depth = dir_tuple
+            for f in cur_dir.iterdir():
+                if f.is_file():
+                    yield f
+                elif f.is_dir() and cur_depth < max_depth:
+                    dirs.append([f, cur_depth + 1])
+            
+        
+
 def aggregate_log_files(
-        log_path: Path, 
+        log_paths: list[Path], 
         start_date: datetime = datetime.min,
         end_date: datetime = datetime.max,
-        time_key: str = "time", 
+        time_key: str = TIME_FIELD, 
+        partition_key: str = "", 
         chunk_size: int = CHUNK_SIZE) -> Iterator[str]:
     """ Given a log file path, run read_file_reverse over all files matching 
     that pattern.
     """
-    sorted_files : list[DateRangedLogFile] = []
-    # Find all newline-delimited JSON files in the given directory
-    all_log_files = [log_path] if log_path.is_file() else [f for f in log_path.iterdir() if f.is_file()]
-    for file_path in all_log_files:
+    sorted_files : dict[str, list[DateRangedLogFile]] = defaultdict(lambda: [])
+    # Find all newline-delimited JSON files in the given directory(s)
+    for file_path in find_log_files(log_paths):
         parsed, fields = _is_structured_logs(file_path)
         # Filter out ndjson objects that don't contain the expected time key
         if not parsed or not time_key in fields:
             continue
-        sorted_files.append(DateRangedLogFile(file_path, datetime.fromisoformat(fields[time_key])))
-    sorted_files.sort(key = lambda file: file.start_time, reverse = True)
+        sorted_files[fields.get(partition_key, "")].append(DateRangedLogFile(file_path, datetime.fromisoformat(fields[time_key])))
 
-    # set the end of each file to the start of the next
-    for file, next_file in zip(sorted_files[1:], sorted_files):
-        file.end_time = next_file.start_time
 
-    for file in sorted_files:
-        fname = file.path
-        if not file.contains_logs_for(start_date, end_date):
-            continue
-        for l in read_file_reverse(fname, chunk_size):
-            yield l
+    print([k for k in sorted_files.keys()])
+    for files in sorted_files.values():
+        files.sort(key = lambda file: file.start_time, reverse = True)
+
+        # set the end of each file to the start of the next
+        for file, next_file in zip(files[1:], files):
+            file.end_time = next_file.start_time
+
+        for file in files:
+            fname = file.path
+            if not file.contains_logs_for(start_date, end_date):
+                continue
+            for l in read_file_reverse(fname, chunk_size):
+                yield l
