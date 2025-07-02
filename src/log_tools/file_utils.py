@@ -4,11 +4,11 @@ import magic
 from pathlib import Path
 from typing import Iterator, Any
 import io
-from .log_utils import safe_parse_line
 from datetime import datetime, timezone
 from dataclasses import dataclass
 from collections import defaultdict
-from common_args import CHUNK_SIZE, TIME_FIELD
+from .log_utils import safe_parse_line
+from .common_args import CHUNK_SIZE, TIME_FIELD
 
 def open_possibly_compressed_file(file_path: Path) -> io.BytesIO:
     """ Using python-magic, expose a plaintext or compressed file in 

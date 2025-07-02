@@ -1,10 +1,11 @@
 import typer
 from datetime import datetime
+from collections import defaultdict
+
 from . import common_args as ca
 from .file_utils import aggregate_log_files
 from .log_tools import dt_in_range_fix_tz, done_iterating
 from .log_utils import safe_parse_line
-from collections import defaultdict
 
 class MissingNumberTracker:
     missing_ranges: list[tuple[int, int]] = []

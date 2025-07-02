@@ -3,11 +3,12 @@ from typing import Annotated
 from datetime import datetime
 from enum import Enum
 import re
+from thefuzz import fuzz
+import sys
+
 from . import common_args as ca
 from .log_utils import safe_parse_line, dt_in_range_fix_tz, done_iterating, pretty_print
 from .file_utils import  aggregate_log_files
-from thefuzz import fuzz
-import sys
 
 filterer = typer.Typer()
 

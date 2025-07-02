@@ -3,3 +3,12 @@ services:
     image: hub.opensciencegrid.org/mwestphall/fluentd
     build:
       context: .
+      dockerfile: ./fluentd.Dockerfile
+
+  jupyter:
+    image: hub.opensciencegrid.org/mwestphall/log-tool-notebook
+    build:
+      context: .
+      dockerfile: ./jupyter.Dockerfile
+    ports:
+      - '8888:8888'

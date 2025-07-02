@@ -1,8 +1,7 @@
 import json
 import typing
-import sys
-from common_args import TIME_FIELD, MSG_FIELD
 from datetime import datetime, timedelta
+from .common_args import TIME_FIELD, MSG_FIELD
 
 
 def safe_parse_line(line: str) -> tuple[bool, dict[str, typing.Any]]:
