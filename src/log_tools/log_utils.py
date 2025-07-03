@@ -51,11 +51,10 @@ COLOR_CODES = {
     "INFO":  "\033[32m", # Green
     "WARN":  "\033[33m", # Yellow
     "ERROR": "\033[31m", # Red
+    "PARTITION": "\033[35m", # Magenta
+    "TIME": "\033[94m", # Bright Blue
     "RESET": "\033[0m" # Unset
 }
-
-# Reserved JSON keys in log message
-SPECIAL_KEYS = ["msg", ]
 
 def pretty_print(
         log_json: dict[str, typing.Any],
@@ -63,10 +62,10 @@ def pretty_print(
         msg_key: str = MSG_FIELD, 
         partition_key: str = "", 
         exclude_keys: str = ""):
-    start_code = COLOR_CODES[log_json.get("level", "RESET")]
+    start_code = COLOR_CODES[log_json.get("level", "INFO")]
     reset_code = COLOR_CODES["RESET"]
 
-    print(f"{log_json.get(time_key)} {log_json.get(partition_key, '')} ", end="")
+    print(f"{COLOR_CODES['TIME']}{log_json.get(time_key)} {COLOR_CODES['PARTITION']}{log_json.get(partition_key, '')}{reset_code} ", end="")
     print(f"{start_code}{log_json.get('level', 'INFO')}:{reset_code} ", end="")
     print(f"{log_json.get(msg_key)} ", end="")
 

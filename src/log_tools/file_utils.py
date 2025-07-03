@@ -136,6 +136,12 @@ def find_log_files_in_date_range(
         yield (key, in_range_files)
 
 
+def read_files_reverse(files: list[DateRangedLogFile], chunk_size: int = CHUNK_SIZE) -> Iterator[str]:
+    for file in files:
+        fname = file.path
+        for line in read_file_reverse(fname, chunk_size):
+            yield line
+
 def aggregate_log_files(
         log_paths: list[Path], 
         start_date: datetime = datetime.min,
@@ -147,7 +153,5 @@ def aggregate_log_files(
     that pattern.
     """
     for _, files in find_log_files_in_date_range(log_paths, start_date, end_date, time_key, partition_key):
-        for file in files:
-            fname = file.path
-            for l in read_file_reverse(fname, chunk_size):
-                yield l
+        for line in read_files_reverse(files, chunk_size):
+            yield line

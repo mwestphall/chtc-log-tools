@@ -8,7 +8,7 @@ import sys
 
 from . import common_args as ca
 from .log_utils import safe_parse_line, dt_in_range_fix_tz, done_iterating, pretty_print
-from .file_utils import  aggregate_log_files
+from .file_utils import  aggregate_log_files, find_log_files_in_date_range, read_files_reverse
 
 filterer = typer.Typer()
 
@@ -53,18 +53,27 @@ def filter_logs_by_date(
 
     output_tty = sys.stdout.isatty()
 
-    for idx, line in enumerate(aggregate_log_files(log_path, start_date, end_date, time_field, partition_key, chunk_size)):
-        parsed, fields = safe_parse_line(line)
-        if not parsed:
+    for _, files in find_log_files_in_date_range(log_path, start_date, end_date, time_field, partition_key):
+        fields = files[0].first_record
+
+        if (partition_filter := filter_list.get(partition_key)) and not value_matches(fields[partition_key], partition_filter, filter_mode):
             continue
 
-        time = datetime.fromisoformat(fields[time_field])
-        if dt_in_range_fix_tz(start_date, time, end_date) and all(value_matches(fields.get(k), f, filter_mode) for k, f in filter_list.items()):
-            if output_tty and not raw_output:
-                pretty_print(fields, time_field, msg_field, partition_key, exclude_keys)
-            else:
-                print(line)
+        matched_lines = 0
+        for line in read_files_reverse(files, chunk_size):
+            parsed, fields = safe_parse_line(line)
+            if not parsed:
+                continue
 
-        if done_iterating(idx, max_lines, time, start_date):
-            break
+            time = datetime.fromisoformat(fields[time_field])
+            if dt_in_range_fix_tz(start_date, time, end_date) and all(value_matches(fields.get(k), f, filter_mode) for k, f in filter_list.items()):
+                if output_tty and not raw_output:
+                    pretty_print(fields, time_field, msg_field, partition_key, exclude_keys)
+                else:
+                    print(line)
+                matched_lines+=1
+
+            if done_iterating(matched_lines, max_lines, time, start_date):
+                break
+        print('---')
 
