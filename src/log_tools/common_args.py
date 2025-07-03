@@ -1,10 +1,10 @@
 import typer
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 from pathlib import Path
 from datetime import datetime
 from typing import Annotated
 
-load_dotenv()
+load_dotenv(find_dotenv(usecwd=True))
 
 TIME_FIELD = "time"
 MSG_FIELD = "msg"

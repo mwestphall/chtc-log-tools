@@ -1,3 +1,6 @@
 # Sample python ".env" file. Copy this into .env
 # And update keys as appropriate to configure the application
-TIME_KEY="time"
+TIME_KEY="timestamp"
+MESSAGE_KEY="message"
+EXCLUDE_KEYS="time_bucket"
+PARTITION_KEYS="hostname"
