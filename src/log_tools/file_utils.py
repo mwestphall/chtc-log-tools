@@ -73,6 +73,7 @@ def _is_structured_logs(file_path: Path) -> tuple[bool, dict[str, Any]]:
 @dataclass
 class DateRangedLogFile:
     path: str
+    first_record: dict[str, Any]
     start_time: datetime
     end_time: datetime = datetime.max.replace(tzinfo=timezone.utc)
 
@@ -106,6 +107,35 @@ def find_log_files(log_paths: list[Path], max_depth = 999) -> Iterator[Path]:
             
         
 
+def find_log_files_in_date_range(
+        log_paths: list[Path], 
+        start_date: datetime = datetime.min,
+        end_date: datetime = datetime.max,
+        time_key: str = TIME_FIELD, 
+        partition_key: str = "") -> Iterator[tuple[str, list[DateRangedLogFile]]]:
+    sorted_files : dict[str, list[DateRangedLogFile]] = defaultdict(lambda: [])
+    # Find all newline-delimited JSON files in the given directory(s)
+    for file_path in find_log_files(log_paths):
+        parsed, fields = _is_structured_logs(file_path)
+        # Filter out ndjson objects that don't contain the expected time key
+        if not parsed or not time_key in fields:
+            continue
+        sorted_files[fields.get(partition_key, "")].append(DateRangedLogFile(file_path, fields, datetime.fromisoformat(fields[time_key])))
+
+
+    for key, files in sorted_files.items():
+        files.sort(key = lambda file: file.start_time, reverse = True)
+
+        # set the end of each file to the start of the next
+        for file, next_file in zip(files[1:], files):
+            file.end_time = next_file.start_time
+
+        # Filter down to the list of files containing records in the date range
+        in_range_files = [f for f in files if f.contains_logs_for(start_date, end_date)]
+
+        yield (key, in_range_files)
+
+
 def aggregate_log_files(
         log_paths: list[Path], 
         start_date: datetime = datetime.min,
@@ -116,27 +146,8 @@ def aggregate_log_files(
     """ Given a log file path, run read_file_reverse over all files matching 
     that pattern.
     """
-    sorted_files : dict[str, list[DateRangedLogFile]] = defaultdict(lambda: [])
-    # Find all newline-delimited JSON files in the given directory(s)
-    for file_path in find_log_files(log_paths):
-        parsed, fields = _is_structured_logs(file_path)
-        # Filter out ndjson objects that don't contain the expected time key
-        if not parsed or not time_key in fields:
-            continue
-        sorted_files[fields.get(partition_key, "")].append(DateRangedLogFile(file_path, datetime.fromisoformat(fields[time_key])))
-
-
-    print([k for k in sorted_files.keys()])
-    for files in sorted_files.values():
-        files.sort(key = lambda file: file.start_time, reverse = True)
-
-        # set the end of each file to the start of the next
-        for file, next_file in zip(files[1:], files):
-            file.end_time = next_file.start_time
-
+    for _, files in find_log_files_in_date_range(log_paths, start_date, end_date, time_key, partition_key):
         for file in files:
             fname = file.path
-            if not file.contains_logs_for(start_date, end_date):
-                continue
             for l in read_file_reverse(fname, chunk_size):
                 yield l
