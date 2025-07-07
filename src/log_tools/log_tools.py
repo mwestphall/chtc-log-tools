@@ -1,14 +1,16 @@
 import typer
-from typing import Annotated
+from typing import Annotated, Any
 from datetime import datetime
 from enum import Enum
 import re
 from thefuzz import fuzz
 import sys
+from collections import deque
+from dataclasses import dataclass
 
 from . import common_args as ca
 from .log_utils import safe_parse_line, dt_in_range_fix_tz, done_iterating, pretty_print
-from .file_utils import  aggregate_log_files, find_log_files_in_date_range, read_files_reverse
+from .file_utils import find_log_files_in_date_range, read_files_reverse, DateRangedLogFile
 
 filterer = typer.Typer()
 
@@ -29,6 +31,80 @@ def value_matches(value: str, filter: str, mode: FilterMode):
         # TODO does having a fixed threshold here make sense?
         return fuzz.partial_ratio(value.lower(), filter.lower()) > 75 
 
+class RotatingDequeue(deque):
+    capacity: int
+    def __init__(self, capacity: int):
+        self.capacity = capacity
+
+    def append(self, x):
+        super().append(x)
+        if len(self) > self.capacity:
+            self.popleft()
+
+@dataclass
+class LogFilteringConfig:
+    start_date: datetime
+    end_date: datetime
+    time_field: str
+    msg_field: str
+    max_lines: int
+    chunk_size: int
+    exclude_keys: str
+    partition_key: str
+    filters: list[str]
+    filter_mode: FilterMode
+    context_window: int
+
+
+    @property
+    def filter_list(self):
+        """ Parse a list of key, value pairs out of filters (assumed to be a list of "key=value" strings)
+        """
+        return dict(f.split("=") for f in self.filters)
+
+
+    def pretty_print(self, fields: dict[str, Any]):
+        pretty_print(fields, self.time_field, self.msg_field, self.partition_key, self.exclude_keys)
+
+    def done_iterating(self, matched_lines: int, time: datetime):
+        return done_iterating(matched_lines, self.max_lines, time, self.start_date)
+
+    def dt_in_range(self, time: datetime):
+        return dt_in_range_fix_tz(self.start_date, time, self.end_date)
+
+    def fields_match_filters(self, fields: dict[str, Any]):
+        return all(value_matches(fields.get(k), f, self.filter_mode) for k, f in self.filter_list.items())
+
+
+def print_partitioned_log_files(files: list[DateRangedLogFile], cfg: LogFilteringConfig):
+    # Queue to hold lines ahead of/behind matches for printing
+    leading_lines : deque[str] = RotatingDequeue(cfg.context_window)
+    trailing_line_count = 0
+    matched_lines = 0
+
+    for line in read_files_reverse(files, cfg.chunk_size):
+        parsed, fields = safe_parse_line(line)
+        if not parsed:
+            continue
+
+        time = datetime.fromisoformat(fields[cfg.time_field])
+        if cfg.dt_in_range(time) and cfg.fields_match_filters(fields):
+            if len(leading_lines):
+                print('--')
+            for field in [*leading_lines, fields]:
+                cfg.pretty_print(field)
+            leading_lines.clear()
+            trailing_line_count = cfg.context_window
+            matched_lines += 1
+        elif trailing_line_count > 0:
+            cfg.pretty_print(fields)
+            trailing_line_count -= 1
+        else:
+            leading_lines.append(fields)
+
+        if trailing_line_count == 0 and cfg.done_iterating(matched_lines, time):
+            break
+
 @filterer.callback(invoke_without_command=True)
 def filter_logs_by_date(
         log_path: ca.LogPathOpt,
@@ -42,38 +118,39 @@ def filter_logs_by_date(
         partition_key: ca.PartitionKeyArg = "",
         filters: Annotated[list[str], typer.Option("-f", "--filters", help="Key-Value pairs that should appear in the logs")] = [],
         filter_mode: Annotated[FilterMode, typer.Option("-m", "--filter-mode", help="String comparison mode to use for filtering logs")] = FilterMode.RAW.value,
-        raw_output: Annotated[bool, typer.Option("--raw", help="Don't pretty-print logs")] = False,
+        context_window: Annotated[int, typer.Option("-C", "--context", help="Number of context lines surrounding filter matches to show")] = 0,
 ):
     """ Reference function that parses newline-delimited, JSON formatted 
     logs based on a time range
     """
 
-    # Parse a list of key, value pairs out of filters (assumed to be a list of "key=value" strings)
-    filter_list : dict[str, str] = dict(f.split("=") for f in filters)
+    filter_config = LogFilteringConfig(
+        start_date, 
+        end_date, 
+        time_field, 
+        msg_field, 
+        max_lines, 
+        chunk_size, 
+        exclude_keys, 
+        partition_key, 
+        filters, 
+        filter_mode, 
+        context_window)
 
-    output_tty = sys.stdout.isatty()
-
+    # Glob plain and compressed files from the input directory
     for _, files in find_log_files_in_date_range(log_path, start_date, end_date, time_field, partition_key):
+        
+        # Skip over files where the partition key (assumed to be the same for each record in a given file) doesn't
+        # match a filter
         fields = files[0].first_record
-
-        if (partition_filter := filter_list.get(partition_key)) and not value_matches(fields[partition_key], partition_filter, filter_mode):
+        if (partition_filter := filter_config.filter_list.get(partition_key)) and not \
+            value_matches(fields[partition_key], partition_filter, filter_mode):
             continue
 
-        matched_lines = 0
-        for line in read_files_reverse(files, chunk_size):
-            parsed, fields = safe_parse_line(line)
-            if not parsed:
-                continue
+        if partition_key:
+            print(f"{partition_key}={fields[partition_key]}")
 
-            time = datetime.fromisoformat(fields[time_field])
-            if dt_in_range_fix_tz(start_date, time, end_date) and all(value_matches(fields.get(k), f, filter_mode) for k, f in filter_list.items()):
-                if output_tty and not raw_output:
-                    pretty_print(fields, time_field, msg_field, partition_key, exclude_keys)
-                else:
-                    print(line)
-                matched_lines+=1
+        print_partitioned_log_files(files, filter_config)
 
-            if done_iterating(matched_lines, max_lines, time, start_date):
-                break
-        print('---')
+        
 
