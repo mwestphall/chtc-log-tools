@@ -104,6 +104,7 @@ def print_partitioned_log_files(files: list[DateRangedLogFile], cfg: LogFilterin
 
         if trailing_line_count == 0 and cfg.done_iterating(matched_lines, time):
             break
+    print("")
 
 @filterer.callback(invoke_without_command=True)
 def filter_logs_by_date(
@@ -148,7 +149,7 @@ def filter_logs_by_date(
             continue
 
         if partition_key:
-            print(f"{partition_key}={fields[partition_key]}")
+            print(f"[{partition_key}={fields[partition_key]}]")
 
         print_partitioned_log_files(files, filter_config)
 
