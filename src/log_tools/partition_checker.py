@@ -34,7 +34,6 @@ def check_log_partitions(
         start_date: ca.StartDateArg = datetime.min,
         end_date: ca.EndDateArg = datetime.max,
         time_field: ca.TimeFieldArg = ca.TIME_FIELD,
-        max_lines: ca.MaxLinesArg = 0,
         chunk_size: ca.ChunkSizeArg = ca.CHUNK_SIZE,
         partition_key: ca.PartitionKeyArg = "",
         filters: Annotated[list[str], typer.Option("-f", "--filters", help="Key-Value pairs that should appear in the logs")] = [],
@@ -52,14 +51,8 @@ def check_log_partitions(
         fields = files[0].first_record
         if not all(value_matches(fields.get(k), f, filter_mode) for k, f in filter_list.items()):
             continue
-        start_time = fields[time_field]
-        end_time = None
-        for l in read_file_reverse(files[-1].path, chunk_size):
-            parsed, fields = safe_parse_line(l)
-            if not parsed:
-                continue
-            end_time = fields[time_field]
-            break
+        start_time = files[0].start_time
+        end_time = files[-1].end_time
 
         rows.append((fields[partition_key], start_time, end_time))
 

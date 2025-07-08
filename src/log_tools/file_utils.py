@@ -112,7 +112,8 @@ def find_log_files_in_date_range(
         start_date: datetime = datetime.min,
         end_date: datetime = datetime.max,
         time_key: str = TIME_FIELD, 
-        partition_key: str = "") -> Iterator[tuple[str, list[DateRangedLogFile]]]:
+        partition_key: str = "",
+        chunk_size: int = CHUNK_SIZE) -> Iterator[tuple[str, list[DateRangedLogFile]]]:
     sorted_files : dict[str, list[DateRangedLogFile]] = defaultdict(lambda: [])
     # Find all newline-delimited JSON files in the given directory(s)
     for file_path in find_log_files(log_paths):
@@ -130,8 +131,19 @@ def find_log_files_in_date_range(
         for file, next_file in zip(files[1:], files):
             file.end_time = next_file.start_time
 
+
+        # set the end of the last file by reading its last record
+        for l in read_file_reverse(files[-1].path, chunk_size):
+            parsed, fields = safe_parse_line(l)
+            if not parsed:
+                continue
+            files[-1].end_time = datetime.fromisoformat(fields[time_key])
+            break
+
         # Filter down to the list of files containing records in the date range
         in_range_files = [f for f in files if f.contains_logs_for(start_date, end_date)]
+        if not in_range_files:
+            continue
 
         yield (key, in_range_files)
 
