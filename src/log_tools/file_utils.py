@@ -125,10 +125,10 @@ def find_log_files_in_date_range(
 
 
     for key, files in sorted_files.items():
-        files.sort(key = lambda file: file.start_time, reverse = True)
+        files.sort(key = lambda file: file.start_time)
 
         # set the end of each file to the start of the next
-        for file, next_file in zip(files[1:], files):
+        for file, next_file in zip(files, files[1:]):
             file.end_time = next_file.start_time
 
 
@@ -145,7 +145,7 @@ def find_log_files_in_date_range(
         if not in_range_files:
             continue
 
-        yield (key, in_range_files)
+        yield (key, in_range_files[::-1])
 
 
 def read_files_reverse(files: list[DateRangedLogFile], chunk_size: int = CHUNK_SIZE) -> Iterator[str]:

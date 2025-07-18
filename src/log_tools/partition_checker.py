@@ -48,11 +48,11 @@ def check_log_partitions(
 
     rows: list[tuple[str, str, str]] = []
     for _, files in find_log_files_in_date_range(log_path, start_date, end_date, time_field, partition_key):
-        fields = files[0].first_record
+        fields = files[-1].first_record
         if not all(value_matches(fields.get(k), f, filter_mode) for k, f in filter_list.items()):
             continue
-        start_time = files[0].start_time
-        end_time = files[-1].end_time
+        start_time = files[-1].start_time
+        end_time = files[0].end_time
 
         rows.append((fields[partition_key], start_time, end_time))
 
