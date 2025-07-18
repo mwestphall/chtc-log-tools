@@ -64,9 +64,10 @@ def pretty_print(
         exclude_keys: str = ""):
     start_code = COLOR_CODES[log_json.get("level", "INFO")]
     reset_code = COLOR_CODES["RESET"]
+    date_string = datetime.fromisoformat(log_json.get(time_key)).strftime("%H:%M:%S")
 
-    print(f"{COLOR_CODES['TIME']}{log_json.get(time_key)} {COLOR_CODES['PARTITION']}{log_json.get(partition_key, '')}{reset_code} ", end="")
-    print(f"{start_code}{log_json.get('level', 'INFO')}:{reset_code} ", end="")
+    print(f"   {COLOR_CODES['TIME']}{date_string}{reset_code} ", end="")
+    print(f"{start_code}{log_json.get('level', 'INFO')}{reset_code} ", end="")
     print(f"{log_json.get(msg_key)} ", end="")
 
 
@@ -78,4 +79,6 @@ def pretty_print(
     print("") # Newline
 
 
-    
+def print_partition_header(log_json: dict[str, typing.Any], time_key: str = TIME_FIELD, partition_key: str = ""):    
+    date_string = datetime.fromisoformat(log_json.get(time_key)).strftime("%Y-%m-%d")
+    print(f"[{COLOR_CODES['TIME']}{date_string} {COLOR_CODES['PARTITION']}{log_json[partition_key]}{COLOR_CODES['RESET']}]")

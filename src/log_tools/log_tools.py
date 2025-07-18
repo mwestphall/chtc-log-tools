@@ -9,7 +9,7 @@ from collections import deque
 from dataclasses import dataclass
 
 from . import common_args as ca
-from .log_utils import safe_parse_line, dt_in_range_fix_tz, done_iterating, pretty_print
+from .log_utils import safe_parse_line, dt_in_range_fix_tz, done_iterating, pretty_print, print_partition_header
 from .file_utils import find_log_files_in_date_range, read_files_reverse, DateRangedLogFile
 
 filterer = typer.Typer()
@@ -41,6 +41,18 @@ class RotatingDequeue(deque):
         if len(self) > self.capacity:
             self.popleft()
 
+@dataclass 
+class PrintedPartition:
+    partition: str
+    date: str
+
+    @property
+    def printed_date(self) -> datetime:
+        return datetime.fromisoformat(self.date).strftime("%Y-%m-%d")
+
+    def __eq__(self, value: "PrintedPartition"):
+        return self.partition == value.partition and self.printed_date == value.printed_date
+
 @dataclass
 class LogFilteringConfig:
     start_date: datetime
@@ -55,16 +67,25 @@ class LogFilteringConfig:
     filter_mode: FilterMode
     context_window: int
 
+    # Stateful item to track when new header metadata needs to be printed
+    last_header: PrintedPartition = None
+
 
     @property
     def filter_list(self):
         """ Parse a list of key, value pairs out of filters (assumed to be a list of "key=value" strings)
         """
-        return dict(f.split("=") for f in self.filters)
+        return dict(f.split("=", 1) for f in self.filters)
 
 
     def pretty_print(self, fields: dict[str, Any]):
+        line_header = PrintedPartition(fields[self.partition_key], fields[self.time_field])
+        if self.last_header is None or self.last_header != line_header:
+            print_partition_header(fields, self.time_field, self.partition_key)
+
         pretty_print(fields, self.time_field, self.msg_field, self.partition_key, self.exclude_keys)
+
+        self.last_header = line_header
 
     def done_iterating(self, matched_lines: int, time: datetime):
         return done_iterating(matched_lines, self.max_lines, time, self.start_date)
@@ -90,7 +111,7 @@ def print_partitioned_log_files(files: list[DateRangedLogFile], cfg: LogFilterin
         time = datetime.fromisoformat(fields[cfg.time_field])
         if cfg.dt_in_range(time) and cfg.fields_match_filters(fields):
             if len(leading_lines):
-                print('--')
+                print('   ...')
             for field in [*leading_lines, fields]:
                 cfg.pretty_print(field)
             leading_lines.clear()
@@ -147,9 +168,6 @@ def filter_logs_by_date(
         if (partition_filter := filter_config.filter_list.get(partition_key)) and not \
             value_matches(fields[partition_key], partition_filter, filter_mode):
             continue
-
-        if partition_key:
-            print(f"[{partition_key}={fields[partition_key]}]")
 
         print_partitioned_log_files(files, filter_config)
 
