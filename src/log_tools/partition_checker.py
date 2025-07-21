@@ -8,25 +8,9 @@ import tabulate
 
 from . import common_args as ca
 from .file_utils import find_log_files_in_date_range, read_file_reverse, safe_parse_line
+from .log_tools import value_matches, FilterMode
 
 partition_checker = typer.Typer()
-
-class FilterMode(Enum):
-    RAW = "raw"
-    REGEX = "regex"
-    FUZZY = "fuzzy"
-
-
-def value_matches(value: str, filter: str, mode: FilterMode):
-    if not value:
-        return False
-    if mode == FilterMode.RAW:
-        return filter.lower() in value.lower()
-    elif mode == FilterMode.REGEX:
-        return re.search(filter, value)
-    else:
-        # TODO does having a fixed threshold here make sense?
-        return fuzz.partial_ratio(value.lower(), filter.lower()) > 75 
 
 @partition_checker.callback(invoke_without_command=True)
 def check_log_partitions(
@@ -34,7 +18,6 @@ def check_log_partitions(
         start_date: ca.StartDateArg = datetime.min,
         end_date: ca.EndDateArg = datetime.max,
         time_field: ca.TimeFieldArg = ca.TIME_FIELD,
-        chunk_size: ca.ChunkSizeArg = ca.CHUNK_SIZE,
         partition_key: ca.PartitionKeyArg = "",
         filters: Annotated[list[str], typer.Option("-f", "--filters", help="Key-Value pairs that should appear in the logs")] = [],
         filter_mode: Annotated[FilterMode, typer.Option("-m", "--filter-mode", help="String comparison mode to use for filtering logs")] = FilterMode.RAW.value,

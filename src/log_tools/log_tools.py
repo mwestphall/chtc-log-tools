@@ -75,7 +75,7 @@ class LogFilteringConfig:
     def filter_list(self):
         """ Parse a list of key, value pairs out of filters (assumed to be a list of "key=value" strings)
         """
-        return dict(f.split("=", 1) for f in self.filters)
+        return [f.split("=", 1) for f in self.filters]
 
 
     def pretty_print(self, fields: dict[str, Any]):
@@ -94,7 +94,7 @@ class LogFilteringConfig:
         return dt_in_range_fix_tz(self.start_date, time, self.end_date)
 
     def fields_match_filters(self, fields: dict[str, Any]):
-        return all(value_matches(fields.get(k), f, self.filter_mode) for k, f in self.filter_list.items())
+        return (value_matches(fields.get(k), f, self.filter_mode) for k, f in self.filter_list)
 
 
 def print_partitioned_log_files(files: list[DateRangedLogFile], cfg: LogFilteringConfig):
@@ -109,7 +109,7 @@ def print_partitioned_log_files(files: list[DateRangedLogFile], cfg: LogFilterin
             continue
 
         time = datetime.fromisoformat(fields[cfg.time_field])
-        if cfg.dt_in_range(time) and cfg.fields_match_filters(fields):
+        if cfg.dt_in_range(time) and all(cfg.fields_match_filters(fields)):
             if len(leading_lines):
                 print('   ...')
             for field in [*leading_lines, fields]:
@@ -165,8 +165,8 @@ def filter_logs_by_date(
         # Skip over files where the partition key (assumed to be the same for each record in a given file) doesn't
         # match a filter
         fields = files[0].first_record
-        if (partition_filter := filter_config.filter_list.get(partition_key)) and not \
-            value_matches(fields[partition_key], partition_filter, filter_mode):
+        partition_filters = [v for k, v in filter_config.filter_list if k == partition_key]
+        if not all(value_matches(fields[partition_key], v, filter_mode) for v in partition_filters):
             continue
 
         print_partitioned_log_files(files, filter_config)
