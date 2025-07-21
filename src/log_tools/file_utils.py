@@ -4,7 +4,7 @@ import magic
 from pathlib import Path
 from typing import Iterator, Any
 import io
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from dataclasses import dataclass
 from collections import defaultdict
 from .log_utils import safe_parse_line
@@ -105,7 +105,21 @@ def find_log_files(log_paths: list[Path], max_depth = 999) -> Iterator[Path]:
                 elif f.is_dir() and cur_depth < max_depth:
                     dirs.append([f, cur_depth + 1])
             
-        
+
+def file_path_in_date_range(file_path: Path, start_date: datetime, end_date: datetime):
+    """ Check if a log file's full path is in the format .../yyyy/mm/dd/log-name. If so,
+    pre-filter based on the supplied date ranges.
+    """
+
+    try:
+        # Try to parse the last 3 directories of the file path as a yyyy-mm-dd string
+        date_str = '-'.join(file_path.parts[-4:-1])
+        file_start = datetime.fromisoformat(date_str)
+        file_end = file_start + timedelta(days=1)
+        return DateRangedLogFile(file_path, None, file_start, file_end).contains_logs_for(start_date, end_date)
+    except ValueError as e:
+        # Can't determine a date based on file path, need to read records
+        return True
 
 def find_log_files_in_date_range(
         log_paths: list[Path], 
@@ -117,6 +131,10 @@ def find_log_files_in_date_range(
     sorted_files : dict[str, list[DateRangedLogFile]] = defaultdict(lambda: [])
     # Find all newline-delimited JSON files in the given directory(s)
     for file_path in find_log_files(log_paths):
+        # Hacky, but attempt to pre-filter files that are not in the supplied date range
+        # by parsing its date range out of its file path
+        if not file_path_in_date_range(file_path, start_date, end_date):
+            continue
         parsed, fields = _is_structured_logs(file_path)
         # Filter out ndjson objects that don't contain the expected time key
         if not parsed or not time_key in fields:

@@ -1,6 +1,6 @@
 import typer
 from typing import Annotated, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 import re
 from thefuzz import fuzz
@@ -56,7 +56,9 @@ class PrintedPartition:
 @dataclass
 class LogFilteringConfig:
     start_date: datetime
+    since: int
     end_date: datetime
+    until: int
     time_field: str
     msg_field: str
     max_lines: int
@@ -69,7 +71,16 @@ class LogFilteringConfig:
 
     # Stateful item to track when new header metadata needs to be printed
     last_header: PrintedPartition = None
+    # Stateful item to track when "now" is for relative times
+    _now: datetime = None
 
+
+
+    @property
+    def now(self):
+        if self._now is None:
+            self._now = datetime.now()
+        return self._now
 
     @property
     def filter_list(self):
@@ -77,6 +88,18 @@ class LogFilteringConfig:
         """
         return [f.split("=", 1) for f in self.filters]
 
+
+    @property
+    def start_time(self):
+        """ Return the absolute or relative start time for this config, depending on whether --since is set
+        """
+        return self.now - timedelta(hours=self.since) if self.since else self.start_date
+
+    @property
+    def end_time(self):
+        """ Return the absolute or relative start time for this config, depending on whether --since is set
+        """
+        return self.now - timedelta(hours=self.until) if self.until else self.start_date
 
     def pretty_print(self, fields: dict[str, Any]):
         line_header = PrintedPartition(fields[self.partition_key], fields[self.time_field])
@@ -88,10 +111,10 @@ class LogFilteringConfig:
         self.last_header = line_header
 
     def done_iterating(self, matched_lines: int, time: datetime):
-        return done_iterating(matched_lines, self.max_lines, time, self.start_date)
+        return done_iterating(matched_lines, self.max_lines, time, self.start_time)
 
     def dt_in_range(self, time: datetime):
-        return dt_in_range_fix_tz(self.start_date, time, self.end_date)
+        return dt_in_range_fix_tz(self.start_time, time, self.end_time)
 
     def fields_match_filters(self, fields: dict[str, Any]):
         return (value_matches(fields.get(k), f, self.filter_mode) for k, f in self.filter_list)
@@ -131,7 +154,9 @@ def print_partitioned_log_files(files: list[DateRangedLogFile], cfg: LogFilterin
 def filter_logs_by_date(
         log_path: ca.LogPathOpt,
         start_date: ca.StartDateArg = datetime.min,
+        since: ca.SinceArg = None,
         end_date: ca.EndDateArg = datetime.max,
+        until: ca.UntilArg = None,
         time_field: ca.TimeFieldArg = ca.TIME_FIELD,
         msg_field: ca.MsgFieldArg = ca.MSG_FIELD,
         max_lines: ca.MaxLinesArg = 0,
@@ -148,7 +173,9 @@ def filter_logs_by_date(
 
     filter_config = LogFilteringConfig(
         start_date, 
+        since,
         end_date, 
+        until,
         time_field, 
         msg_field, 
         max_lines, 

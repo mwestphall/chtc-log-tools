@@ -1,7 +1,7 @@
 import typer
 from dotenv import load_dotenv, find_dotenv
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Annotated
 
 load_dotenv(find_dotenv(usecwd=True))
@@ -15,6 +15,8 @@ EXCLUDE_KEYS = "level,sequence_info"
 LogPathOpt = Annotated[list[Path], typer.Argument(help="Path to the log file(s) to parse")]
 StartDateArg = Annotated[datetime, typer.Option(help="First date/time from which to return logs")]
 EndDateArg = Annotated[datetime, typer.Option(help="Last date/time from which to return logs")]
+SinceArg = Annotated[int, typer.Option(help="First date/time from which to return logs, relative to current time (in hours)")]
+UntilArg = Annotated[int, typer.Option(help="Last date/time from which to return logs, relative to current time (in hours)")]
 MaxLinesArg = Annotated[int, typer.Option(help="Max number of lines to seek backwards")]
 TimeFieldArg = Annotated[str, typer.Option(help="Structured log field to parse timestamps from", envvar="TIME_KEY")]
 MsgFieldArg = Annotated[str, typer.Option(help="Structured log field containing the main body of the message", envvar="MESSAGE_KEY")]
