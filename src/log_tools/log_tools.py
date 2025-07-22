@@ -210,7 +210,7 @@ def filter_logs_by_date(
         _to)
 
     # Glob plain and compressed files from the input directory
-    for _, files in find_log_files_in_date_range(log_path, start_date, end_date, time_field, partition_key):
+    for _, files in find_log_files_in_date_range(log_path, filter_config.start_time, filter_config.end_time, time_field, partition_key):
         
         # Skip over files where the partition key (assumed to be the same for each record in a given file) doesn't
         # match a filter
