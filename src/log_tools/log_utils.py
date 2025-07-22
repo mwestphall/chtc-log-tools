@@ -1,5 +1,6 @@
 import json
 import typing
+import re
 from datetime import datetime, timedelta
 from .common_args import TIME_FIELD, MSG_FIELD
 
@@ -51,10 +52,13 @@ COLOR_CODES = {
     "INFO":  "\033[32m", # Green
     "WARN":  "\033[33m", # Yellow
     "ERROR": "\033[31m", # Red
+    "FATAL": "\033[31m", # Also Red
     "PARTITION": "\033[35m", # Magenta
     "TIME": "\033[94m", # Bright Blue
     "RESET": "\033[0m" # Unset
 }
+
+LEVEL_RE = re.compile(r'^(DEBUG|INFO|WARN|ERROR|FATAL)[: ]*(.*)')
 
 def pretty_print(
         log_json: dict[str, typing.Any],
@@ -62,16 +66,23 @@ def pretty_print(
         msg_key: str = MSG_FIELD, 
         partition_key: str = "", 
         exclude_keys: str = ""):
+
+    # If level is not explicitly set, try to get it from the log message
+    if not log_json.get('level') and (msg_match := LEVEL_RE.match(log_json[msg_key])):
+        log_json['level'] = msg_match[1]
+        log_json[msg_key] = msg_match[2]
+
     start_code = COLOR_CODES[log_json.get("level", "INFO")]
     reset_code = COLOR_CODES["RESET"]
     date_string = datetime.fromisoformat(log_json.get(time_key)).strftime("%H:%M:%S")
 
+
     print(f"   {COLOR_CODES['TIME']}{date_string}{reset_code} ", end="")
-    print(f"{start_code}{log_json.get('level', 'INFO')}{reset_code} ", end="")
+    print(f"{start_code}{log_json.get('level', 'INFO'):5}{reset_code} ", end="")
     print(f"{log_json.get(msg_key)} ", end="")
 
 
-    extra_attrs = [f"{k}={v}" for k, v in log_json.items() if k not in [time_key, msg_key, partition_key, *exclude_keys.split(",")]]
+    extra_attrs = [f"{k}={v}" for k, v in log_json.items() if k not in [time_key, msg_key, partition_key, 'level', *exclude_keys.split(",")]]
     if extra_attrs:
         print(f"[{', '.join(extra_attrs)}]", end="")
 
