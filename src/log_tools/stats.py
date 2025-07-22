@@ -59,7 +59,6 @@ def get_filter_match_stats(
         partition_key: ca.PartitionKeyArg = "",
         filters: Annotated[list[str], typer.Option("-f", "--filters", help="Key-Value pairs that should appear in the logs")] = [],
         filter_mode: Annotated[FilterMode, typer.Option("-m", "--filter-mode", help="String comparison mode to use for filtering logs")] = FilterMode.RAW.value,
-        context_window: Annotated[int, typer.Option("-C", "--context", help="Number of context lines surrounding filter matches to show")] = 0,
 ):
     """ Tabulate the count of matching filters in log messages across a partition key
     """
@@ -76,8 +75,7 @@ def get_filter_match_stats(
         exclude_keys, 
         partition_key, 
         filters, 
-        filter_mode, 
-        context_window)
+        filter_mode)
 
     all_rows = []
     headers = []

@@ -55,6 +55,7 @@ class PrintedPartition:
 
 @dataclass
 class LogFilteringConfig:
+    # Required/common parameters
     start_date: datetime
     since: int
     end_date: datetime
@@ -67,7 +68,11 @@ class LogFilteringConfig:
     partition_key: str
     filters: list[str]
     filter_mode: FilterMode
-    context_window: int
+
+    # Optional parameters
+    context_window: int = 0
+    _from: str = ""
+    _to: str = ""
 
     # Stateful item to track when new header metadata needs to be printed
     last_header: PrintedPartition = None
@@ -99,7 +104,7 @@ class LogFilteringConfig:
     def end_time(self):
         """ Return the absolute or relative start time for this config, depending on whether --since is set
         """
-        return self.now - timedelta(hours=self.until) if self.until else self.start_date
+        return self.now - timedelta(hours=self.until) if self.until else self.end_date
 
     def pretty_print(self, fields: dict[str, Any]):
         line_header = PrintedPartition(fields[self.partition_key], fields[self.time_field])
@@ -117,7 +122,7 @@ class LogFilteringConfig:
         return dt_in_range_fix_tz(self.start_time, time, self.end_time)
 
     def fields_match_filters(self, fields: dict[str, Any]):
-        return (value_matches(fields.get(k), f, self.filter_mode) for k, f in self.filter_list)
+        return (not self.filter_list) or (value_matches(fields.get(k), f, self.filter_mode) for k, f in self.filter_list)
 
 
 def print_partitioned_log_files(files: list[DateRangedLogFile], cfg: LogFilteringConfig):
@@ -126,9 +131,23 @@ def print_partitioned_log_files(files: list[DateRangedLogFile], cfg: LogFilterin
     trailing_line_count = 0
     matched_lines = 0
 
+    in_context = not (cfg._from and cfg._to)
+
     for line in read_files_reverse(files, cfg.chunk_size):
         parsed, fields = safe_parse_line(line)
         if not parsed:
+            continue
+
+        if cfg._from and not in_context:
+            field, _filter = cfg._from.split('=', 1)
+            in_context = value_matches(fields.get(field), _filter, cfg.filter_mode)
+        elif cfg._to and in_context:
+            field, _filter = cfg._to.split('=', 1)
+            in_context = not value_matches(fields.get(field), _filter, cfg.filter_mode)
+            if not in_context:
+                cfg.pretty_print(fields)
+                break # TODO support printing more than one context window
+        if not in_context:
             continue
 
         time = datetime.fromisoformat(fields[cfg.time_field])
@@ -166,6 +185,8 @@ def filter_logs_by_date(
         filters: Annotated[list[str], typer.Option("-f", "--filters", help="Key-Value pairs that should appear in the logs")] = [],
         filter_mode: Annotated[FilterMode, typer.Option("-m", "--filter-mode", help="String comparison mode to use for filtering logs")] = FilterMode.RAW.value,
         context_window: Annotated[int, typer.Option("-C", "--context", help="Number of context lines surrounding filter matches to show")] = 0,
+        _from: Annotated[str, typer.Option("--from", help="Log pattern from which to start displaying lines")] = 0,
+        _to: Annotated[str, typer.Option("--to", help="Log pattern from which to stop displaying lines")] = 0,
 ):
     """ Reference function that parses newline-delimited, JSON formatted 
     logs based on a time range
@@ -184,7 +205,9 @@ def filter_logs_by_date(
         partition_key, 
         filters, 
         filter_mode, 
-        context_window)
+        context_window,
+        _from,
+        _to)
 
     # Glob plain and compressed files from the input directory
     for _, files in find_log_files_in_date_range(log_path, start_date, end_date, time_field, partition_key):
