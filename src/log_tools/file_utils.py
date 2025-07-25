@@ -60,7 +60,7 @@ def read_file_reverse(file_path: Path, chunk_size=CHUNK_SIZE) -> Iterator[str]:
         if buffer and buffer.strip():
             yield buffer
 
-def _is_structured_logs(file_path: Path) -> tuple[bool, dict[str, Any]]:
+def _is_structured_logs(file_path: Path, time_key: str) -> tuple[bool, dict[str, Any]]:
     """ 
     Check whether a given file (probably) contains structured logs by checking whether
     its first line is JSON-deserializable
@@ -68,7 +68,7 @@ def _is_structured_logs(file_path: Path) -> tuple[bool, dict[str, Any]]:
     with open_possibly_compressed_file(file_path) as f:
         # TODO handle/skip headers?
         line = f.readline().decode()
-        return safe_parse_line(line)
+        return safe_parse_line(line, time_key)
 
 @dataclass
 class DateRangedLogFile:
@@ -135,11 +135,11 @@ def find_log_files_in_date_range(
         # by parsing its date range out of its file path
         if not file_path_in_date_range(file_path, start_date, end_date):
             continue
-        parsed, fields = _is_structured_logs(file_path)
+        parsed, fields = _is_structured_logs(file_path, time_key)
         # Filter out ndjson objects that don't contain the expected time key
         if not parsed or not time_key in fields:
             continue
-        sorted_files[fields.get(partition_key, "")].append(DateRangedLogFile(file_path, fields, datetime.fromisoformat(fields[time_key])))
+        sorted_files[fields.get(partition_key, "")].append(DateRangedLogFile(file_path, fields, fields[time_key]))
 
 
     for key, files in sorted_files.items():
@@ -152,10 +152,10 @@ def find_log_files_in_date_range(
 
         # set the end of the last file by reading its last record
         for l in read_file_reverse(files[-1].path, chunk_size):
-            parsed, fields = safe_parse_line(l)
+            parsed, fields = safe_parse_line(l, time_key)
             if not parsed:
                 continue
-            files[-1].end_time = datetime.fromisoformat(fields[time_key])
+            files[-1].end_time = fields[time_key]
             break
 
         # Filter down to the list of files containing records in the date range

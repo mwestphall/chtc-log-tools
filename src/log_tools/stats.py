@@ -22,7 +22,7 @@ def tabluate_log_matches(files: list[DateRangedLogFile], cfg: LogFilteringConfig
     }
 
     for line in read_files_reverse(files, cfg.chunk_size):
-        parsed, fields = safe_parse_line(line)
+        parsed, fields = safe_parse_line(line, cfg.time_field)
         if not parsed:
             continue
         for k, v in non_partition_keys:
@@ -30,8 +30,7 @@ def tabluate_log_matches(files: list[DateRangedLogFile], cfg: LogFilteringConfig
                 filter_counts[fields.get(cfg.partition_key)][(k, v)] += 1
 
 
-        time = datetime.fromisoformat(fields[cfg.time_field])
-        if cfg.done_iterating(matched_lines, time):
+        if cfg.done_iterating(matched_lines, fields[cfg.time_field]):
             break
 
 

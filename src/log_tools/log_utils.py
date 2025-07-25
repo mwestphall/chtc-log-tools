@@ -1,11 +1,12 @@
 import json
 import typing
 import re
+import pytz
 from datetime import datetime, timedelta
 from .common_args import TIME_FIELD, MSG_FIELD
 
 
-def safe_parse_line(line: str) -> tuple[bool, dict[str, typing.Any]]:
+def safe_parse_line(line: str, time_key: str) -> tuple[bool, dict[str, typing.Any]]:
     """ Attempt to parse a line as JSON, logging an error and returning false
     if parsing fails
     """
@@ -13,7 +14,11 @@ def safe_parse_line(line: str) -> tuple[bool, dict[str, typing.Any]]:
         return False, {}
     try: 
         # fluentd records are tab-delimited, typically the JSON body will be the last field
-        return True, json.loads(line.split('\t')[-1])
+        fields = json.loads(line.split('\t')[-1])
+        if not time_key in fields:
+            return False, None
+        fields[time_key] = convert_log_tz(fields[time_key])
+        return True, fields
     except json.JSONDecodeError as e:
         print(f"Unable to JSON-decode formatted line '{line}'")
         return False, {}
@@ -36,6 +41,11 @@ def compare_dts_fix_tz(date1: datetime, date2: datetime):
     date2_tz = date2.replace(tzinfo = date2.tzinfo or date1.tzinfo)
 
     return date1_tz - date2_tz
+
+def convert_log_tz(date_str: str, display_tz: str = 'America/Chicago'):
+    parsed_date = datetime.fromisoformat(date_str)
+    return parsed_date if display_tz is None else parsed_date.astimezone(pytz.timezone(display_tz))
+
 
 
 def done_iterating(idx: int, max_lines: int, time: datetime, start_time: datetime, time_window: int = 10):
@@ -74,7 +84,7 @@ def pretty_print(
 
     start_code = COLOR_CODES[log_json.get("level", "INFO")]
     reset_code = COLOR_CODES["RESET"]
-    date_string = datetime.fromisoformat(log_json.get(time_key)).strftime("%H:%M:%S")
+    date_string = log_json.get(time_key).strftime("%H:%M:%S")
 
 
     print(f"   {COLOR_CODES['TIME']}{date_string}{reset_code} ", end="")
@@ -91,5 +101,5 @@ def pretty_print(
 
 
 def print_partition_header(log_json: dict[str, typing.Any], time_key: str = TIME_FIELD, partition_key: str = ""):    
-    date_string = datetime.fromisoformat(log_json.get(time_key)).strftime("%Y-%m-%d")
+    date_string = log_json.get(time_key).strftime("%Y-%m-%d")
     print(f"[{COLOR_CODES['TIME']}{date_string} {COLOR_CODES['PARTITION']}{log_json[partition_key]}{COLOR_CODES['RESET']}]")

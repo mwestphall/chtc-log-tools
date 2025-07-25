@@ -9,7 +9,7 @@ from collections import deque
 from dataclasses import dataclass
 
 from . import common_args as ca
-from .log_utils import safe_parse_line, dt_in_range_fix_tz, done_iterating, pretty_print, print_partition_header
+from .log_utils import safe_parse_line, dt_in_range_fix_tz, done_iterating, pretty_print, print_partition_header, convert_log_tz
 from .file_utils import find_log_files_in_date_range, read_files_reverse, DateRangedLogFile
 
 filterer = typer.Typer()
@@ -44,11 +44,11 @@ class RotatingDequeue(deque):
 @dataclass 
 class PrintedPartition:
     partition: str
-    date: str
+    date: datetime
 
     @property
     def printed_date(self) -> datetime:
-        return datetime.fromisoformat(self.date).strftime("%Y-%m-%d")
+        return self.date.strftime("%Y-%m-%d")
 
     def __eq__(self, value: "PrintedPartition"):
         return self.partition == value.partition and self.printed_date == value.printed_date
@@ -124,6 +124,35 @@ class LogFilteringConfig:
     def fields_match_filters(self, fields: dict[str, Any]):
         return (not self.filter_list) or (value_matches(fields.get(k), f, self.filter_mode) for k, f in self.filter_list)
 
+@dataclass
+class ContextWindow:
+    """ Utility class for tracking whether or not the log stream is "inside" a
+    printable window 
+    """
+    _from: str
+    _to: str
+    filter_mode: FilterMode
+       
+    # state variable
+    in_context = None
+
+
+    def update_context(self, fields: dict[str, Any]) -> tuple[bool, bool]:
+        if self.in_context is None:
+            # If there's no start/stop filter, the log stream is always in context
+            self.in_context = not (self._from and self._to)
+
+        if self._from and not self.in_context:
+            field, _filter = self._from.split('=', 1)
+            self.in_context = value_matches(fields.get(field), _filter, self.filter_mode)
+        elif self._to and self.in_context:
+            field, _filter = self._to.split('=', 1)
+            self.in_context = not value_matches(fields.get(field), _filter, self.filter_mode)
+            if not self.in_context:
+                return (False, True)
+        
+        return self.in_context, False
+
 
 def print_partitioned_log_files(files: list[DateRangedLogFile], cfg: LogFilteringConfig):
     # Queue to hold lines ahead of/behind matches for printing
@@ -131,26 +160,21 @@ def print_partitioned_log_files(files: list[DateRangedLogFile], cfg: LogFilterin
     trailing_line_count = 0
     matched_lines = 0
 
-    in_context = not (cfg._from and cfg._to)
+    context_window = ContextWindow(cfg._from, cfg._to, cfg.filter_mode)
 
     for line in read_files_reverse(files, cfg.chunk_size):
-        parsed, fields = safe_parse_line(line)
+        parsed, fields = safe_parse_line(line, cfg.time_field)
         if not parsed:
             continue
 
-        if cfg._from and not in_context:
-            field, _filter = cfg._from.split('=', 1)
-            in_context = value_matches(fields.get(field), _filter, cfg.filter_mode)
-        elif cfg._to and in_context:
-            field, _filter = cfg._to.split('=', 1)
-            in_context = not value_matches(fields.get(field), _filter, cfg.filter_mode)
-            if not in_context:
-                cfg.pretty_print(fields)
-                break # TODO support printing more than one context window
-        if not in_context:
+        in_context, done = context_window.update_context(fields)
+        if done:
+            cfg.pretty_print(fields)
+            break
+        elif not in_context:
             continue
 
-        time = datetime.fromisoformat(fields[cfg.time_field])
+        time = fields[cfg.time_field]
         if cfg.dt_in_range(time) and all(cfg.fields_match_filters(fields)):
             if len(leading_lines):
                 print('   ...')

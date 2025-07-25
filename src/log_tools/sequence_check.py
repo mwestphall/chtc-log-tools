@@ -97,11 +97,11 @@ def check_sequence(
     # For each logger, record every log sequence appearing under its logger ID
     logger_ids = defaultdict(MissingNumberTracker)
     for idx, line in enumerate(aggregate_log_files(log_path, start_date, end_date, time_field)):
-        parsed, fields = safe_parse_line(line)
+        parsed, fields = safe_parse_line(line, time_field)
         if not parsed:
             continue
 
-        time = datetime.fromisoformat(fields[time_field])
+        time = fields[time_field]
         if dt_in_range_fix_tz(start_date, time, end_date) and fields.get("sequence_info", dict()).get("logger_id"):
             logger_ids[fields["sequence_info"]["logger_id"]].add_number(fields["sequence_info"]["sequence_no"])
 
