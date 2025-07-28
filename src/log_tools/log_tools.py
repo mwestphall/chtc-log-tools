@@ -33,6 +33,8 @@ def value_matches(value: str, filter: str, mode: FilterMode):
         return fuzz.partial_ratio(value.lower(), filter.lower()) > 75 
 
 class RotatingDequeue(deque):
+    """ Store the past X log messages for printing in the before/after context window
+    """
     capacity: int
     def __init__(self, capacity: int):
         self.capacity = capacity
@@ -44,6 +46,10 @@ class RotatingDequeue(deque):
 
 @dataclass 
 class PrintedPartition:
+    """
+    Utility class for grouping a set of log messages under a [pod name, year-month-day] 
+    header
+    """
     partition: str
     date: datetime
 
@@ -56,6 +62,10 @@ class PrintedPartition:
 
 @dataclass
 class LogFilteringConfig:
+    """ Data class for passing all the arguments that are common across cli invocations between
+    functions, as well as utility functions such as calculating values derived from multiple
+    cli args
+    """
     # Required/common parameters
     start_date: datetime
     since: int
