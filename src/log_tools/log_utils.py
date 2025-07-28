@@ -102,4 +102,4 @@ def pretty_print(
 
 def print_partition_header(log_json: dict[str, typing.Any], time_key: str = TIME_FIELD, partition_key: str = ""):    
     date_string = log_json.get(time_key).strftime("%Y-%m-%d")
-    print(f"[{COLOR_CODES['TIME']}{date_string} {COLOR_CODES['PARTITION']}{log_json[partition_key]}{COLOR_CODES['RESET']}]")
+    print(f"\n[{COLOR_CODES['TIME']}{date_string} {COLOR_CODES['PARTITION']}{log_json[partition_key]}{COLOR_CODES['RESET']}]")

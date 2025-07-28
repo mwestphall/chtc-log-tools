@@ -168,14 +168,15 @@ def print_partitioned_log_files(files: list[DateRangedLogFile], cfg: LogFilterin
         if not parsed:
             continue
 
-        in_context, done = context_window.update_context(fields)
-        if done:
-            cfg.pretty_print(fields)
-            break
-        elif not in_context:
-            continue
-
         time = fields[cfg.time_field]
+        if cfg.dt_in_range(time):
+            in_context, done = context_window.update_context(fields)
+            if done:
+                cfg.pretty_print(fields)
+                break
+            elif not in_context:
+                continue
+
         if cfg.dt_in_range(time) and all(cfg.fields_match_filters(fields)):
             if len(leading_lines):
                 print('   ...')
@@ -192,7 +193,6 @@ def print_partitioned_log_files(files: list[DateRangedLogFile], cfg: LogFilterin
 
         if trailing_line_count == 0 and cfg.done_iterating(matched_lines, time):
             break
-    print("")
 
 @filterer.callback(invoke_without_command=True)
 def filter_logs_by_date(
@@ -213,8 +213,9 @@ def filter_logs_by_date(
         _from: Annotated[str, typer.Option("--from", help="Log pattern from which to start displaying lines")] = 0,
         _to: Annotated[str, typer.Option("--to", help="Log pattern from which to stop displaying lines")] = 0,
 ):
-    """ Reference function that parses newline-delimited, JSON formatted 
-    logs based on a time range
+    """ Parse a set of newline-delimited, JSON formatted log files, printing 
+    log messages that match both the specified set of text filters and
+    date ranges.
     """
 
     filter_config = LogFilteringConfig(
