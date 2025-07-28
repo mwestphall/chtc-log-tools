@@ -88,9 +88,8 @@ class DateRangedLogFile:
 
 
 def find_log_files(log_paths: list[Path], max_depth = 999) -> Iterator[Path]:
-    """
-    Given a set of log paths or directories containing logs, and a max search depth, yield
-    all individual files in those paths
+    """ Given a set of log paths or directories containing logs, and a max search depth, 
+    yield all individual files in those paths
     """
     for p in log_paths:
         if p.is_file():

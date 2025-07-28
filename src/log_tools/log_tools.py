@@ -1,13 +1,13 @@
 import typer
 from typing import Annotated, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 import re
 from thefuzz import fuzz
-import sys
-import pytz
+import io
 from collections import deque
 from dataclasses import dataclass
+from contextlib import redirect_stdout, nullcontext
 
 from . import common_args as ca
 from .log_utils import safe_parse_line, dt_in_range_fix_tz, done_iterating, pretty_print, print_partition_header, convert_log_tz
@@ -46,12 +46,18 @@ class RotatingDequeue(deque):
 
 @dataclass 
 class PrintedPartition:
-    """
-    Utility class for grouping a set of log messages under a [pod name, year-month-day] 
-    header
+    """ Utility class for grouping a set of log messages under a 
+    [pod name, year-month-day] header
     """
     partition: str
     date: datetime
+
+    # Some log output modes require printing just a subset of output,
+    # buffer it per header to allow filtering before print
+    buf: io.StringIO = None
+
+    def __post_init__(self):
+        self.buf = io.StringIO()
 
     @property
     def printed_date(self) -> datetime:
@@ -59,6 +65,9 @@ class PrintedPartition:
 
     def __eq__(self, value: "PrintedPartition"):
         return self.partition == value.partition and self.printed_date == value.printed_date
+
+    def __ne__(self, value):
+        return not self.__eq__(value)
 
 @dataclass
 class LogFilteringConfig:
@@ -85,17 +94,33 @@ class LogFilteringConfig:
     _from: str = ""
     _to: str = ""
 
-    # Stateful item to track when new header metadata needs to be printed
-    last_header: PrintedPartition = None
+
+    # Stateful item to track which printed logs belong to which pod/date grouping
+    log_partitions: list[PrintedPartition] = None 
+
     # Stateful item to track when "now" is for relative times
     _now: datetime = None
 
 
 
     @property
+    def last_header(self) -> PrintedPartition:
+        if not self.log_partitions:
+            return None
+        return self.log_partitions[-1]
+
+    
+    @last_header.setter
+    def last_header(self, value: PrintedPartition):
+        if not self.log_partitions:
+            self.log_partitions = []
+        self.log_partitions.append(value)
+
+
+    @property
     def now(self):
         if self._now is None:
-            self._now = datetime.now()
+            self._now = datetime.now().astimezone(timezone.utc)
         return self._now
 
     @property
@@ -109,22 +134,32 @@ class LogFilteringConfig:
     def start_time(self):
         """ Return the absolute or relative start time for this config, depending on whether --since is set
         """
-        return self.now - timedelta(hours=self.since) if self.since else ca.DISPLAY_TZ.localize(self.start_date)
+        if self.start_date is None:
+            return datetime.min
+        elif self.since:
+            return self.now - timedelta(hours=self.since)
+        else:
+            return ca.DISPLAY_TZ.localize(self.start_date)
 
     @property
     def end_time(self):
-        """ Return the absolute or relative start time for this config, depending on whether --since is set
+        """ Return the absolute or relative start time for this config, depending on whether --until is set
         """
-        return self.now - timedelta(hours=self.until) if self.until else ca.DISPLAY_TZ.localize(self.end_date)
+        if self.end_date is None:
+            return datetime.max
+        elif self.until:
+            return self.now + timedelta(hours=self.until)
+        else:
+            return ca.DISPLAY_TZ.localize(self.end_date)
 
     def pretty_print(self, fields: dict[str, Any]):
         line_header = PrintedPartition(fields[self.partition_key], fields[self.time_field])
         if self.last_header is None or self.last_header != line_header:
+            self.last_header = line_header
             print_partition_header(fields, self.time_field, self.partition_key)
 
         pretty_print(fields, self.time_field, self.msg_field, self.partition_key, self.exclude_keys)
 
-        self.last_header = line_header
 
     def done_iterating(self, matched_lines: int, time: datetime):
         return done_iterating(matched_lines, self.max_lines, time, self.start_time)
@@ -134,6 +169,11 @@ class LogFilteringConfig:
 
     def fields_match_filters(self, fields: dict[str, Any]):
         return (not self.filter_list) or (value_matches(fields.get(k), f, self.filter_mode) for k, f in self.filter_list)
+
+
+    def write(self, *args, **kwargs):
+        if self.last_header:
+            self.last_header.buf.write(*args, **kwargs)
 
 @dataclass
 class ContextWindow:
@@ -163,7 +203,6 @@ class ContextWindow:
                 return (False, True)
         
         return self.in_context, False
-
 
 def print_partitioned_log_files(files: list[DateRangedLogFile], cfg: LogFilteringConfig):
     # Queue to hold lines ahead of/behind matches for printing
@@ -207,9 +246,9 @@ def print_partitioned_log_files(files: list[DateRangedLogFile], cfg: LogFilterin
 @filterer.callback(invoke_without_command=True)
 def filter_logs_by_date(
         log_path: ca.LogPathOpt,
-        start_date: ca.StartDateArg = datetime.min,
+        start_date: ca.StartDateArg = None,
         since: ca.SinceArg = None,
-        end_date: ca.EndDateArg = datetime.max,
+        end_date: ca.EndDateArg = None,
         until: ca.UntilArg = None,
         time_field: ca.TimeFieldArg = ca.TIME_FIELD,
         msg_field: ca.MsgFieldArg = ca.MSG_FIELD,
@@ -222,6 +261,7 @@ def filter_logs_by_date(
         context_window: Annotated[int, typer.Option("-C", "--context", help="Number of context lines surrounding filter matches to show")] = 0,
         _from: Annotated[str, typer.Option("--from", help="Log pattern from which to start displaying lines")] = 0,
         _to: Annotated[str, typer.Option("--to", help="Log pattern from which to stop displaying lines")] = 0,
+        latest: Annotated[bool, typer.Option("--latest", help="Print just the most recent contiguous set of log lines that match the filters")] = False,
 ):
     """ Parse a set of newline-delimited, JSON formatted log files, printing 
     log messages that match both the specified set of text filters and
@@ -245,17 +285,24 @@ def filter_logs_by_date(
         _from,
         _to)
 
-    # Glob plain and compressed files from the input directory
-    for _, files in find_log_files_in_date_range(log_path, filter_config.start_time, filter_config.end_time, time_field, partition_key):
-        
-        # Skip over files where the partition key (assumed to be the same for each record in a given file) doesn't
-        # match a filter
-        fields = files[0].first_record
-        partition_filters = [v for k, v in filter_config.filter_list if k == partition_key]
-        if not all(value_matches(fields[partition_key], v, filter_mode) for v in partition_filters):
-            continue
 
-        print_partitioned_log_files(files, filter_config)
+    redirect_context = redirect_stdout(filter_config) if latest else nullcontext()
+    with redirect_context:
+        # Glob plain and compressed files from the input directory
+        for _, files in find_log_files_in_date_range(log_path, filter_config.start_time, filter_config.end_time, time_field, partition_key):
+            # Skip over files where the partition key (assumed to be the same for each record in a given file) doesn't
+            # match a filter
+            fields = files[0].first_record
+            partition_filters = [v for k, v in filter_config.filter_list if k == partition_key]
+            if not all(value_matches(fields[partition_key], v, filter_mode) for v in partition_filters):
+                continue
+
+            print_partitioned_log_files(files, filter_config)
+
+
+    if latest:
+        latest_partition = sorted(filter_config.log_partitions, key=lambda p: p.date, reverse=True)[0]
+        print(latest_partition.buf.getvalue())
 
         
 
