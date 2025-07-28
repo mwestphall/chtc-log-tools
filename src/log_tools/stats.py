@@ -46,9 +46,9 @@ def tabluate_log_matches(files: list[DateRangedLogFile], cfg: LogFilteringConfig
 @stats.callback(invoke_without_command=True)
 def get_filter_match_stats(
         log_path: ca.LogPathOpt,
-        start_date: ca.StartDateArg = datetime.min,
+        start_date: ca.StartDateArg = None,
         since: ca.SinceArg = None,
-        end_date: ca.EndDateArg = datetime.max,
+        end_date: ca.EndDateArg = None,
         until: ca.UntilArg = None,
         time_field: ca.TimeFieldArg = ca.TIME_FIELD,
         msg_field: ca.MsgFieldArg = ca.MSG_FIELD,

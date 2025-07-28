@@ -259,8 +259,8 @@ def filter_logs_by_date(
         filters: Annotated[list[str], typer.Option("-f", "--filters", help="Key-Value pairs that should appear in the logs")] = [],
         filter_mode: Annotated[FilterMode, typer.Option("-m", "--filter-mode", help="String comparison mode to use for filtering logs")] = FilterMode.RAW.value,
         context_window: Annotated[int, typer.Option("-C", "--context", help="Number of context lines surrounding filter matches to show")] = 0,
-        _from: Annotated[str, typer.Option("--from", help="Log pattern from which to start displaying lines")] = 0,
-        _to: Annotated[str, typer.Option("--to", help="Log pattern from which to stop displaying lines")] = 0,
+        _from: Annotated[str, typer.Option("--from", help="Log pattern from which to start displaying lines")] = '',
+        _to: Annotated[str, typer.Option("--to", help="Log pattern from which to stop displaying lines")] = '',
         latest: Annotated[bool, typer.Option("--latest", help="Print just the most recent contiguous set of log lines that match the filters")] = False,
 ):
     """ Parse a set of newline-delimited, JSON formatted log files, printing 
