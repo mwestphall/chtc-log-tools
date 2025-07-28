@@ -114,7 +114,8 @@ def file_path_in_date_range(file_path: Path, start_date: datetime, end_date: dat
     try:
         # Try to parse the last 3 directories of the file path as a yyyy-mm-dd string
         date_str = '-'.join(file_path.parts[-4:-1])
-        file_start = datetime.fromisoformat(date_str)
+        # TODO we have to assume here logs' default timestamps are in utc
+        file_start = datetime.fromisoformat(date_str).replace(tzinfo=timezone.utc)
         file_end = file_start + timedelta(days=1)
         return DateRangedLogFile(file_path, None, file_start, file_end).contains_logs_for(start_date, end_date)
     except ValueError as e:

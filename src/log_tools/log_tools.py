@@ -5,6 +5,7 @@ from enum import Enum
 import re
 from thefuzz import fuzz
 import sys
+import pytz
 from collections import deque
 from dataclasses import dataclass
 
@@ -98,13 +99,13 @@ class LogFilteringConfig:
     def start_time(self):
         """ Return the absolute or relative start time for this config, depending on whether --since is set
         """
-        return self.now - timedelta(hours=self.since) if self.since else self.start_date
+        return self.now - timedelta(hours=self.since) if self.since else ca.DISPLAY_TZ.localize(self.start_date)
 
     @property
     def end_time(self):
         """ Return the absolute or relative start time for this config, depending on whether --since is set
         """
-        return self.now - timedelta(hours=self.until) if self.until else self.end_date
+        return self.now - timedelta(hours=self.until) if self.until else ca.DISPLAY_TZ.localize(self.end_date)
 
     def pretty_print(self, fields: dict[str, Any]):
         line_header = PrintedPartition(fields[self.partition_key], fields[self.time_field])

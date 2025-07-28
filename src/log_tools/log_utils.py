@@ -3,7 +3,7 @@ import typing
 import re
 import pytz
 from datetime import datetime, timedelta
-from .common_args import TIME_FIELD, MSG_FIELD
+from .common_args import TIME_FIELD, MSG_FIELD, DISPLAY_TZ
 
 
 def safe_parse_line(line: str, time_key: str) -> tuple[bool, dict[str, typing.Any]]:
@@ -42,9 +42,9 @@ def compare_dts_fix_tz(date1: datetime, date2: datetime):
 
     return date1_tz - date2_tz
 
-def convert_log_tz(date_str: str, display_tz: str = 'America/Chicago'):
+def convert_log_tz(date_str: str):
     parsed_date = datetime.fromisoformat(date_str)
-    return parsed_date if display_tz is None else parsed_date.astimezone(pytz.timezone(display_tz))
+    return parsed_date.astimezone(DISPLAY_TZ)
 
 
 
