@@ -1,7 +1,7 @@
-import json
 import typing
 import re
 import pytz
+import msgspec
 from datetime import datetime, timedelta, timezone
 from .common_args import TIME_FIELD, MSG_FIELD, DISPLAY_TZ
 
@@ -14,12 +14,12 @@ def safe_parse_line(line: str, time_key: str) -> tuple[bool, dict[str, typing.An
         return False, {}
     try: 
         # fluentd records are tab-delimited, typically the JSON body will be the last field
-        fields = json.loads(line.split('\t')[-1])
+        fields = msgspec.json.decode(line.split('\t')[-1])
         fields[time_key] = datetime.fromisoformat(fields[time_key]).replace(tzinfo=timezone.utc)
         if not time_key in fields:
             return False, None
         return True, fields
-    except json.JSONDecodeError as e:
+    except msgspec.DecodeError as e:
         print(f"Unable to JSON-decode formatted line '{line}'")
         return False, {}
 
