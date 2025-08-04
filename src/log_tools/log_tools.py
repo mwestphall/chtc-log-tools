@@ -140,10 +140,10 @@ class LogFilteringConfig:
         """ Return the absolute or relative start time for this config, depending on whether --since is set
         """
         if self._start_time is None:
-            if self.start_date is None:
-                self._start_time = datetime.min.replace(tzinfo=timezone.utc)
-            elif self.since:
+            if self.since:
                 self._start_time = self.now - timedelta(hours=self.since)
+            elif self.start_date is None:
+                self._start_time = datetime.min.replace(tzinfo=timezone.utc)
             else:
                 self._start_time = ca.DISPLAY_TZ.localize(self.start_date).astimezone(timezone.utc)
         return self._start_time
@@ -153,10 +153,10 @@ class LogFilteringConfig:
         """ Return the absolute or relative start time for this config, depending on whether --until is set
         """
         if self._end_time is None:
-            if self.end_date is None:
-                self._end_time = datetime.max.replace(tzinfo=timezone.utc)
-            elif self.until:
+            if self.until:
                 self._end_time = self.now + timedelta(hours=self.until)
+            elif self.end_date is None:
+                self._end_time = datetime.max.replace(tzinfo=timezone.utc)
             else:
                 self._end_time = ca.DISPLAY_TZ.localize(self.end_date).astimezone(timezone.utc)
         return self._end_time
@@ -309,7 +309,7 @@ def filter_logs_by_date(
             print_partitioned_log_files(files, filter_config)
 
 
-    if latest:
+    if latest and filter_config.log_partitions:
         latest_partition = sorted(filter_config.log_partitions, key=lambda p: p.date, reverse=True)[0]
         print(latest_partition.buf.getvalue())
 
