@@ -145,7 +145,7 @@ class LogFilteringConfig:
             elif self.since:
                 self._start_time = self.now - timedelta(hours=self.since)
             else:
-                self._start_time = ca.DISPLAY_TZ.localize(self.start_date)
+                self._start_time = ca.DISPLAY_TZ.localize(self.start_date).astimezone(timezone.utc)
         return self._start_time
 
     @property
@@ -158,7 +158,7 @@ class LogFilteringConfig:
             elif self.until:
                 self._end_time = self.now + timedelta(hours=self.until)
             else:
-                self._end_time = ca.DISPLAY_TZ.localize(self.end_date)
+                self._end_time = ca.DISPLAY_TZ.localize(self.end_date).astimezone(timezone.utc)
         return self._end_time
 
     def pretty_print(self, fields: dict[str, Any]):

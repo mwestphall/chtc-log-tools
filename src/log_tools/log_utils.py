@@ -2,7 +2,7 @@ import json
 import typing
 import re
 import pytz
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from .common_args import TIME_FIELD, MSG_FIELD, DISPLAY_TZ
 
 
@@ -15,9 +15,9 @@ def safe_parse_line(line: str, time_key: str) -> tuple[bool, dict[str, typing.An
     try: 
         # fluentd records are tab-delimited, typically the JSON body will be the last field
         fields = json.loads(line.split('\t')[-1])
+        fields[time_key] = datetime.fromisoformat(fields[time_key]).replace(tzinfo=timezone.utc)
         if not time_key in fields:
             return False, None
-        fields[time_key] = convert_log_tz(fields[time_key])
         return True, fields
     except json.JSONDecodeError as e:
         print(f"Unable to JSON-decode formatted line '{line}'")
@@ -42,9 +42,8 @@ def compare_dts_fix_tz(date1: datetime, date2: datetime):
 
     return date1_tz - date2_tz
 
-def convert_log_tz(date_str: str):
-    parsed_date = datetime.fromisoformat(date_str)
-    return parsed_date.astimezone(DISPLAY_TZ)
+def convert_log_tz(date: datetime):
+    return date.astimezone(DISPLAY_TZ)
 
 
 
@@ -84,7 +83,7 @@ def pretty_print(
 
     start_code = COLOR_CODES[log_json.get("level", "INFO")]
     reset_code = COLOR_CODES["RESET"]
-    date_string = log_json.get(time_key).strftime("%H:%M:%S")
+    date_string = convert_log_tz(log_json.get(time_key)).strftime("%H:%M:%S")
 
 
     print(f"   {COLOR_CODES['TIME']}{date_string}{reset_code} ", end="")
