@@ -28,8 +28,8 @@ def dt_in_range_fix_tz(start_date: datetime, date: datetime, end_date: datetime)
     Check whether a given date falls within a start and stop date, applying the
     date's tz to the range endpoints if they do not yet have them
     """
-    start_date = start_date.replace(tzinfo=start_date.tzinfo or date.tzinfo)
-    end_date = end_date.replace(tzinfo=start_date.tzinfo or date.tzinfo)
+    start_date = start_date if start_date.tzinfo else start_date.replace(tzinfo=date.tzinfo)
+    end_date = end_date if end_date.tzinfo else end_date.replace(tzinfo=date.tzinfo)
 
     return start_date <= date <= end_date
 
@@ -37,8 +37,8 @@ def compare_dts_fix_tz(date1: datetime, date2: datetime):
     """
     Compare two dates, merging their timezones if one is timezone-less
     """
-    date1_tz = date1.replace(tzinfo = date1.tzinfo or date2.tzinfo)
-    date2_tz = date2.replace(tzinfo = date2.tzinfo or date1.tzinfo)
+    date1_tz = date1 if date1.tzinfo else date1.replace(tzinfo = date2.tzinfo)
+    date2_tz = date2 if date2.tzinfo else date2.replace(tzinfo = date1.tzinfo)
 
     return date1_tz - date2_tz
 

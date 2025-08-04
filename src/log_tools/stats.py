@@ -85,7 +85,7 @@ def get_filter_match_stats(
         # match a filter
         fields = files[0].first_record
         partition_filters = [v for k, v in filter_config.filter_list if k == partition_key]
-        if not all(value_matches(fields[partition_key], v, filter_mode) for v in partition_filters):
+        if not all(value_matches(fields.get(partition_key), v, filter_mode) for v in partition_filters):
             continue
 
         rows, headers = tabluate_log_matches(files, filter_config)

@@ -101,6 +101,11 @@ class LogFilteringConfig:
     # Stateful item to track when "now" is for relative times
     _now: datetime = None
 
+    # Cache computed time values
+    _start_time: datetime = None
+    _end_time: datetime = None
+
+
 
 
     @property
@@ -134,26 +139,30 @@ class LogFilteringConfig:
     def start_time(self):
         """ Return the absolute or relative start time for this config, depending on whether --since is set
         """
-        if self.start_date is None:
-            return datetime.min
-        elif self.since:
-            return self.now - timedelta(hours=self.since)
-        else:
-            return ca.DISPLAY_TZ.localize(self.start_date)
+        if self._start_time is None:
+            if self.start_date is None:
+                self._start_time = datetime.min
+            elif self.since:
+                self._start_time = self.now - timedelta(hours=self.since)
+            else:
+                self._start_time = ca.DISPLAY_TZ.localize(self.start_date)
+        return self._start_time
 
     @property
     def end_time(self):
         """ Return the absolute or relative start time for this config, depending on whether --until is set
         """
-        if self.end_date is None:
-            return datetime.max
-        elif self.until:
-            return self.now + timedelta(hours=self.until)
-        else:
-            return ca.DISPLAY_TZ.localize(self.end_date)
+        if self._end_time is None:
+            if self.end_date is None:
+                self._end_time = datetime.max
+            elif self.until:
+                self._end_time = self.now + timedelta(hours=self.until)
+            else:
+                self._end_time = ca.DISPLAY_TZ.localize(self.end_date)
+        return self._end_time
 
     def pretty_print(self, fields: dict[str, Any]):
-        line_header = PrintedPartition(fields[self.partition_key], fields[self.time_field])
+        line_header = PrintedPartition(fields.get(self.partition_key), fields[self.time_field])
         if self.last_header is None or self.last_header != line_header:
             self.last_header = line_header
             print_partition_header(fields, self.time_field, self.partition_key)
@@ -294,7 +303,7 @@ def filter_logs_by_date(
             # match a filter
             fields = files[0].first_record
             partition_filters = [v for k, v in filter_config.filter_list if k == partition_key]
-            if not all(value_matches(fields[partition_key], v, filter_mode) for v in partition_filters):
+            if not all(value_matches(fields.get(partition_key), v, filter_mode) for v in partition_filters):
                 continue
 
             print_partitioned_log_files(files, filter_config)

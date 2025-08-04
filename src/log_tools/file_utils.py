@@ -80,8 +80,8 @@ class DateRangedLogFile:
 
     def contains_logs_for(self, start_time: datetime, end_time: datetime):
         """ Return whether this log's time range overlaps with the given time range"""
-        start_time_tz = start_time.replace(tzinfo=start_time.tzinfo or self.start_time.tzinfo)
-        end_time_tz = end_time.replace(tzinfo=end_time.tzinfo or self.end_time.tzinfo)
+        start_time_tz = start_time if start_time.tzinfo else start_time.replace(tzinfo=self.start_time.tzinfo)
+        end_time_tz = end_time if end_time.tzinfo else end_time.replace(tzinfo=self.end_time.tzinfo)
         latest_start = max(self.start_time, start_time_tz)
         earliest_end = min(self.end_time, end_time_tz)
         return earliest_end > latest_start
