@@ -141,7 +141,7 @@ class LogFilteringConfig:
         """
         if self._start_time is None:
             if self.start_date is None:
-                self._start_time = datetime.min
+                self._start_time = datetime.min.replace(tzinfo=timezone.utc)
             elif self.since:
                 self._start_time = self.now - timedelta(hours=self.since)
             else:
@@ -154,7 +154,7 @@ class LogFilteringConfig:
         """
         if self._end_time is None:
             if self.end_date is None:
-                self._end_time = datetime.max
+                self._end_time = datetime.max.replace(tzinfo=timezone.utc)
             elif self.until:
                 self._end_time = self.now + timedelta(hours=self.until)
             else:
