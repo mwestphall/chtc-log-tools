@@ -39,5 +39,5 @@ def check_log_partitions(
 
         rows.append((fields[partition_key], start_time, end_time))
 
-    print(tabulate.tabulate(rows, headers=[partition_key.title(), "First Record", "Last Record"]))
+    print(tabulate.tabulate(rows, headers=[partition_key.title(), "First Record", "Last Record"], tablefmt='rounded_outline'))
 

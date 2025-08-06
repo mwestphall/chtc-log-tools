@@ -34,9 +34,9 @@ def tabluate_log_matches(files: list[DateRangedLogFile], cfg: LogFilteringConfig
             break
 
 
-    rows = [[k, *(c for c in v.values())] for k, v in filter_counts.items()]
+    rows = [[k, *(c or '' for c in v.values())] for k, v in filter_counts.items()]
     
-    headers = [cfg.partition_key, *[f"{k}={v}" for k,v in non_partition_keys]]
+    headers = [cfg.partition_key, *[v if k == cfg.msg_field else f"{k}={v}" for k,v in non_partition_keys]]
 
     return rows, headers
 
@@ -91,4 +91,5 @@ def get_filter_match_stats(
         rows, headers = tabluate_log_matches(files, filter_config)
         all_rows += rows
 
-    print(tabulate.tabulate(all_rows, headers=headers))
+    colaign = ('left', *('right' for _ in headers[1:]))
+    print(tabulate.tabulate(all_rows, headers=headers, tablefmt='rounded_outline', colalign=colaign))
