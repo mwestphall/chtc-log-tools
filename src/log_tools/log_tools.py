@@ -15,6 +15,7 @@ from .file_utils import find_log_files_in_date_range, read_files_reverse, DateRa
 
 filterer = typer.Typer()
 
+
 class FilterMode(Enum):
     RAW = "raw"
     REGEX = "regex"
@@ -143,7 +144,7 @@ class LogFilteringConfig:
             if self.since:
                 self._start_time = self.now - timedelta(hours=self.since)
             elif self.start_date is None:
-                self._start_time = datetime.min.replace(tzinfo=timezone.utc)
+                self._start_time = ca.DT_BUFFERED_MIN.replace(tzinfo=timezone.utc)
             else:
                 self._start_time = ca.DISPLAY_TZ.localize(self.start_date).astimezone(timezone.utc)
         return self._start_time
@@ -156,7 +157,7 @@ class LogFilteringConfig:
             if self.until:
                 self._end_time = self.now + timedelta(hours=self.until)
             elif self.end_date is None:
-                self._end_time = datetime.max.replace(tzinfo=timezone.utc)
+                self._end_time = ca.DT_BUFFERED_MAX.replace(tzinfo=timezone.utc)
             else:
                 self._end_time = ca.DISPLAY_TZ.localize(self.end_date).astimezone(timezone.utc)
         return self._end_time

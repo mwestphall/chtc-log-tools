@@ -8,7 +8,7 @@ from datetime import datetime, timezone, timedelta
 from dataclasses import dataclass
 from collections import defaultdict
 from .log_utils import safe_parse_line
-from .common_args import CHUNK_SIZE, TIME_FIELD
+from .common_args import CHUNK_SIZE, TIME_FIELD, DT_BUFFERED_MIN, DT_BUFFERED_MAX
 
 def open_possibly_compressed_file(file_path: Path) -> io.BytesIO:
     """ Using python-magic, expose a plaintext or compressed file in 
@@ -121,8 +121,8 @@ def file_path_in_date_range(file_path: Path, start_date: datetime, end_date: dat
 
 def find_log_files_in_date_range(
         log_paths: list[Path], 
-        start_date: datetime = datetime.min,
-        end_date: datetime = datetime.max,
+        start_date: datetime = DT_BUFFERED_MIN,
+        end_date: datetime = DT_BUFFERED_MAX,
         time_key: str = TIME_FIELD, 
         partition_key: str = "",
         chunk_size: int = CHUNK_SIZE) -> Iterator[tuple[str, list[DateRangedLogFile]]]:
@@ -172,8 +172,8 @@ def read_files_reverse(files: list[DateRangedLogFile], chunk_size: int = CHUNK_S
 
 def aggregate_log_files(
         log_paths: list[Path], 
-        start_date: datetime = datetime.min,
-        end_date: datetime = datetime.max,
+        start_date: datetime = DT_BUFFERED_MIN,
+        end_date: datetime = DT_BUFFERED_MAX,
         time_key: str = TIME_FIELD, 
         partition_key: str = "", 
         chunk_size: int = CHUNK_SIZE) -> Iterator[str]:

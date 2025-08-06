@@ -8,8 +8,7 @@ from .stats import stats
 
 app = typer.Typer()
 app.add_typer(filterer, name="filter")
-app.add_typer(partition_checker, name="check")
-app.add_typer(sequence, name="sequence")
+app.add_typer(partition_checker, name="times")
 app.add_typer(stats, name="stats")
 
 
