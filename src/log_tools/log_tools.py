@@ -320,6 +320,9 @@ def filter_logs_by_date(
     if latest and filter_config.log_partitions:
         latest_partition = sorted(filter_config.log_partitions, key=lambda p: p.date, reverse=True)[0]
         print(latest_partition.buf.getvalue())
+    
+    if not filter_config.log_partitions:
+        print(f"No logs found for given filters in given date range.")
 
         
 
