@@ -3,7 +3,8 @@ import re
 import pytz
 import msgspec
 from datetime import datetime, timedelta, timezone
-from .common_args import TIME_FIELD, MSG_FIELD, DISPLAY_TZ
+from collections import defaultdict
+from .common_args import TIME_FIELD, MSG_FIELD, DISPLAY_TZ, TTY_OUTPUT
 
 
 def safe_parse_line(line: str, time_key: str) -> tuple[bool, dict[str, typing.Any]]:
@@ -59,7 +60,7 @@ COLOR_CODES = {
     "PARTITION": "\033[35m", # Magenta
     "TIME": "\033[94m", # Bright Blue
     "RESET": "\033[0m" # Unset
-}
+} if TTY_OUTPUT else defaultdict(lambda: "")
 
 LEVEL_RE = re.compile(r'^(DEBUG|INFO|WARN|ERROR|FATAL)[: ]*(.*)')
 
@@ -67,9 +68,10 @@ def pretty_print(
         log_json: dict[str, typing.Any],
         time_key: str = TIME_FIELD, 
         msg_key: str = MSG_FIELD, 
-        partition_key: str = "", 
+        partition_keys: list[str] = [""], 
         exclude_keys: str = ""):
 
+    
     # If level is not explicitly set, try to get it from the log message
     if not log_json.get('level') and (msg_match := LEVEL_RE.match(log_json[msg_key])):
         log_json['level'] = msg_match[1]
@@ -85,7 +87,7 @@ def pretty_print(
     print(f"{log_json.get(msg_key)} ", end="")
 
 
-    extra_attrs = [f"{k}={v}" for k, v in log_json.items() if k not in [time_key, msg_key, partition_key, 'level', *exclude_keys.split(",")]]
+    extra_attrs = [f"{k}={v}" for k, v in log_json.items() if k not in [time_key, msg_key, 'level', *partition_keys, *exclude_keys.split(",")]]
     if extra_attrs:
         print(f"[{', '.join(extra_attrs)}]", end="")
 
@@ -93,6 +95,7 @@ def pretty_print(
     print("") # Newline
 
 
-def print_partition_header(log_json: dict[str, typing.Any], time_key: str = TIME_FIELD, partition_key: str = ""):    
+def print_partition_header(log_json: dict[str, typing.Any], time_key: str = TIME_FIELD, partition_keys: list[str] = [""]):    
     date_string = log_json.get(time_key).strftime("%Y-%m-%d")
-    print(f"\n[{COLOR_CODES['TIME']}{date_string} {COLOR_CODES['PARTITION']}{log_json[partition_key]}{COLOR_CODES['RESET']}]")
+    partition_key_list = ' '.join(f"{k}={log_json[k]}" for k in partition_keys)
+    print(f"\n[{COLOR_CODES['TIME']}{date_string} {COLOR_CODES['PARTITION']}{partition_key_list}{COLOR_CODES['RESET']}]")

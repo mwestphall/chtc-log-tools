@@ -2,5 +2,4 @@
 # And update keys as appropriate to configure the application
 TIME_KEY="timestamp"
 MESSAGE_KEY="message"
-EXCLUDE_KEYS="time_bucket"
-PARTITION_KEYS="hostname"
+PARTITION_KEYS="pod,node,glideinset,shape"

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import pytz
 from typing import Annotated
 from os import environ
+import sys
 
 load_dotenv(find_dotenv(usecwd=True))
 
@@ -13,6 +14,9 @@ MSG_FIELD = "msg"
 # Want to read a lot of the file into memory at once since decompression is expensive time-wise
 CHUNK_SIZE = 4 * 1024 * 1024
 EXCLUDE_KEYS = "level,sequence_info"
+
+# Whether to output "fancy" with colors for interactive output
+TTY_OUTPUT = sys.stdout.isatty()
 
 # TODO code paths for timezone substititution are too nested to easily pass as arg, make global derived from
 # env instead

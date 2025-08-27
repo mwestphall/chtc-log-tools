@@ -6,6 +6,6 @@ RUN apt-get update && apt-get install -y libmagic1
 COPY src/ /tmp/src/
 COPY pyproject.toml /tmp/
 
-RUN pip install /tmp
+RUN pip install /tmp && pip install ipywidgets
 
 USER jovyan

@@ -86,7 +86,7 @@ class LogFilteringConfig:
     max_lines: int
     chunk_size: int
     exclude_keys: str
-    partition_key: str
+    _partition_key: str
     filters: list[str]
     filter_mode: FilterMode
 
@@ -122,6 +122,13 @@ class LogFilteringConfig:
             self.log_partitions = []
         self.log_partitions.append(value)
 
+    @property
+    def partition_key(self):
+        return self._partition_key.split(',')[0]
+    
+    @property
+    def partition_keys(self):
+        return self._partition_key.split(',')
 
     @property
     def now(self):
@@ -166,9 +173,9 @@ class LogFilteringConfig:
         line_header = PrintedPartition(fields.get(self.partition_key), fields[self.time_field])
         if self.last_header is None or self.last_header != line_header:
             self.last_header = line_header
-            print_partition_header(fields, self.time_field, self.partition_key)
+            print_partition_header(fields, self.time_field, self.partition_keys)
 
-        pretty_print(fields, self.time_field, self.msg_field, self.partition_key, self.exclude_keys)
+        pretty_print(fields, self.time_field, self.msg_field, self.partition_keys, self.exclude_keys)
 
 
     def done_iterating(self, matched_lines: int, time: datetime):
@@ -178,7 +185,7 @@ class LogFilteringConfig:
         return dt_in_range_fix_tz(self.start_time, time, self.end_time)
 
     def fields_match_filters(self, fields: dict[str, Any]):
-        return (not self.filter_list) or (value_matches(fields.get(k), f, self.filter_mode) for k, f in self.filter_list)
+        return [] if not self.filter_list else (value_matches(fields.get(k), f, self.filter_mode) for k, f in self.filter_list)
 
 
     def write(self, *args, **kwargs):
