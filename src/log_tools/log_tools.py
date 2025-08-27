@@ -243,7 +243,10 @@ def print_partitioned_log_files(files: list[DateRangedLogFile], cfg: LogFilterin
             elif not in_context:
                 continue
 
-        if cfg.dt_in_range(time) and all(cfg.fields_match_filters(fields)):
+        if trailing_line_count > 0:
+            cfg.pretty_print(fields)
+            trailing_line_count -= 1
+        elif cfg.dt_in_range(time) and all(cfg.fields_match_filters(fields)):
             if len(leading_lines):
                 print('   ...')
             for field in [*leading_lines, fields]:
@@ -251,9 +254,6 @@ def print_partitioned_log_files(files: list[DateRangedLogFile], cfg: LogFilterin
             leading_lines.clear()
             trailing_line_count = cfg.context_window
             matched_lines += 1
-        elif trailing_line_count > 0:
-            cfg.pretty_print(fields)
-            trailing_line_count -= 1
         else:
             leading_lines.append(fields)
 

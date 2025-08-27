@@ -47,7 +47,7 @@ def done_iterating(idx: int, max_lines: int, time: datetime, start_time: datetim
     Util function to check whether the script should stop iterating over log lines
     given an index and an earliest log date
     """
-    return ((max_lines and idx > max_lines) or
+    return ((max_lines and idx >= max_lines) or
         compare_dts_fix_tz(start_time, time) > timedelta(minutes=time_window))
 
 
