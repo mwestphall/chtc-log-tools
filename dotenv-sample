@@ -2,4 +2,5 @@
 # And update keys as appropriate to configure the application
 TIME_KEY="timestamp"
 MESSAGE_KEY="message"
-PARTITION_KEYS="pod,node,glideinset,shape"
+EXCLUDE_KEYS="glideinset"
+PARTITION_KEYS="pod,node,shape"
